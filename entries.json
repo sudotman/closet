@@ -1,0 +1,82 @@
+[
+  {
+    "id": "img-mountain",
+    "type": "image",
+    "title": "alpine breath",
+    "src": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop",
+    "alt": "mountains",
+    "x": -900,
+    "y": -300,
+    "tags": ["photo", "nature"]
+  },
+  {
+    "id": "text-haiku",
+    "type": "text",
+    "title": "small words",
+    "text": "wind on steel\nlonely elevators sing\nnight folds inward",
+    "x": -200,
+    "y": -520,
+    "tags": ["poem", "haiku"]
+  },
+  {
+    "id": "link-portfolio",
+    "type": "link",
+    "title": "portfolio",
+    "url": "https://satyamkashyap.com",
+    "linkText": "satyamkashyap.com",
+    "x": 420,
+    "y": -380,
+    "tags": ["link", "work"]
+  },
+  {
+    "id": "yt-piece",
+    "type": "youtube",
+    "title": "party4u",
+    "youtubeId": "agu22bqGHto",
+    "x": 200,
+    "y": 220,
+    "tags": ["video"]
+  },
+  {
+    "id": "textlink-paper",
+    "type": "text_link",
+    "title": "paper",
+    "text": "my favorite paper on simplicity",
+    "url": "https://ciechanow.ski",
+    "linkText": "ciechanow.ski",
+    "x": -640,
+    "y": 240,
+    "tags": ["reading"]
+  },
+  {
+    "id": "img-chair",
+    "type": "image",
+    "title": "a chair that waits",
+    "src": "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=1600&auto=format&fit=crop",
+    "alt": "chair",
+    "x": -60,
+    "y": -40,
+    "tags": ["object", "design"]
+  },
+  {
+    "id": "text-note",
+    "type": "text",
+    "title": "note",
+    "text": "Less, but better. The edges matter.",
+    "x": 760,
+    "y": 40,
+    "tags": ["note"]
+  },
+  {
+    "id": "link-github",
+    "type": "link",
+    "title": "github",
+    "url": "https://github.com/s8y",
+    "linkText": "@s8y",
+    "x": -1060,
+    "y": -60,
+    "tags": ["social"]
+  }
+]
+
+

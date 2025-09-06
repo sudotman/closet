@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>closet · satyam k</title>
+    <meta name="description" content="A drifting canvas of things by Satyam Kashyap." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="ui">
+      <div class="brand">closet</div>
+      <div class="search">
+        <input id="searchInput" type="text" placeholder="search…" autocomplete="off" spellcheck="false" />
+        <ul id="searchResults" class="results" aria-label="search results"></ul>
+      </div>
+      <div class="help">drag to explore · enter to jump</div>
+    </div>
+
+    <div id="viewport" aria-label="canvas viewport">
+      <div id="world" aria-label="canvas world"></div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+  </html>
+
+
