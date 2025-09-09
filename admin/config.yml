@@ -26,18 +26,29 @@ collections:
         format: "json"
         fields:
           - { label: "Entries", name: "root", widget: "list", label_singular: "Entry", collapsed: true, fields: [
-              { label: "ID", name: "id", widget: "string" },
               { label: "Type", name: "type", widget: "select", options: ["image","text","link","text_link","youtube"] },
               { label: "Title", name: "title", widget: "string", required: false },
-              { label: "X", name: "x", widget: "number" },
-              { label: "Y", name: "y", widget: "number" },
-              { label: "Tags", name: "tags", widget: "list", required: false },
-              { label: "Image src", name: "src", widget: "image", required: false },
-              { label: "Alt", name: "alt", widget: "string", required: false },
               { label: "Text", name: "text", widget: "text", required: false },
               { label: "URL", name: "url", widget: "string", required: false },
               { label: "Link Text", name: "linkText", widget: "string", required: false },
-              { label: "YouTube ID", name: "youtubeId", widget: "string", required: false }
+              { label: "Image src", name: "src", widget: "image", required: false },
+              { label: "Alt", name: "alt", widget: "string", required: false },
+              { label: "YouTube ID", name: "youtubeId", widget: "string", required: false },
+              { label: "Tags", name: "tags", widget: "relation", required: false, collection: "tags", multiple: true, search_fields: ["name"], value_field: "name", display_fields: ["name"], allow_add: true },
+              { label: "ID", name: "id", widget: "string", required: false, hint: "Optional. Leave blank to auto-generate a stable ID." },
+              { label: "X", name: "x", widget: "number", required: false, hint: "Optional. Leave blank for auto-placement." },
+              { label: "Y", name: "y", widget: "number", required: false, hint: "Optional. Leave blank for auto-placement." }
             ] }
+
+  - name: "tags"
+    label: "Tags"
+    label_singular: "Tag"
+    folder: "tags"
+    create: true
+    identifier_field: name
+    slug: "{{slug}}"
+    format: "json"
+    fields:
+      - { label: "Name", name: "name", widget: "string" }
 
 
