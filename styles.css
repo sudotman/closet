@@ -38,7 +38,7 @@ body::before {
 .shuffle-btn {
   position: fixed;
   left: 16px;
-  top: 100px;
+  bottom: 16px;
   padding: 8px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
@@ -49,6 +49,7 @@ body::before {
   text-transform: lowercase;
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+  z-index: 11;
 }
 .shuffle-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.28); }
 .shuffle-btn:active { transform: translateY(1px); }
