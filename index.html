@@ -29,6 +29,18 @@
     </div>
 
     <script src="script.js"></script>
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <script>
+      // Ensure OAuth callbacks landing on the Netlify domain are handled
+      if (window.netlifyIdentity) {
+        window.netlifyIdentity.init({
+          APIUrl: 'https://closet-api-towards.netlify.app/.netlify/identity'
+        });
+        window.netlifyIdentity.on('login', function () {
+          try { window.netlifyIdentity.close(); } catch (e) {}
+        });
+      }
+    </script>
   </body>
   </html>
 
