@@ -89,7 +89,8 @@ body::before {
 .entry.link a { color: var(--fg); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.2); }
 .entry.link a:hover { border-color: var(--accent); color: var(--accent); }
 .entry.text_link a { color: var(--accent); }
-.entry.youtube iframe { width: 420px; max-width: 70vw; aspect-ratio: 16/9; border: 0; border-radius: 12px; display: block; }
+.entry.youtube { overflow: hidden; }
+.entry.youtube iframe { width: 100%; max-width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 12px; display: block; }
 
 .pill { display: inline-block; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 11px; color: var(--muted); }
 
