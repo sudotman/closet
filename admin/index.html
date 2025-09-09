@@ -12,8 +12,9 @@
     </style>
   </head>
   <body>
-    <!-- Decap CMS -->
-    <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
+    <!-- Decap CMS (manual init) -->
+    <script>window.CMS_MANUAL_INIT = true;</script>
+    <script src="https://unpkg.com/decap-cms@latest/dist/decap-cms.js?v=3"></script>
     <script>
       // Netlify Identity widget + explicit APIUrl so it doesn't call /.netlify/identity on this domain
       (function() {
@@ -25,6 +26,34 @@
             window.netlifyIdentity.init({
               APIUrl: 'https://closet-api-towards.netlify.app/.netlify/identity'
             });
+            function ensureFullNameLocal(user) {
+              try {
+                if (!user) return;
+                if (!user.user_metadata) user.user_metadata = {};
+                if (!user.user_metadata.full_name) {
+                  user.user_metadata.full_name = (user.email || '').split('@')[0] || 'user';
+                }
+              } catch (e) {}
+            }
+            function startCMS() {
+              if (window.CMS && typeof window.CMS.init === 'function') {
+                try { window.CMS.init(); } catch (e) { console.error('CMS init failed', e); }
+              }
+            }
+            window.netlifyIdentity.on('init', function(user){
+              ensureFullNameLocal(user);
+              startCMS();
+            });
+            window.netlifyIdentity.on('login', function(user){
+              ensureFullNameLocal(user);
+              try { window.netlifyIdentity.close(); } catch(e) {}
+              startCMS();
+            });
+            window.netlifyIdentity.on('logout', function(){
+              startCMS();
+            });
+            // If no identity events fire (e.g., guest), still init CMS
+            setTimeout(startCMS, 400);
           }
         };
         document.body.appendChild(s);

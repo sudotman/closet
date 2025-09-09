@@ -40,6 +40,15 @@
   {
     "id": "yt-piece",
     "type": "youtube",
+    "title": "fills my heart everytime I see this",
+    "youtubeId": "ROIGX9zaRbk",
+    "x": 200,
+    "y": 220,
+    "tags": ["video"]
+  },
+  {
+    "id": "yt-piece",
+    "type": "youtube",
     "title": "party4u",
     "youtubeId": "agu22bqGHto",
     "x": 200,
@@ -71,7 +80,7 @@
     "id": "text-note",
     "type": "text",
     "title": "note",
-    "text": "Less, but better. The edges matter.",
+    "text": "less is always more.",
     "x": 760,
     "y": 40,
     "tags": ["note"]
@@ -80,8 +89,8 @@
     "id": "link-github",
     "type": "link",
     "title": "github",
-    "url": "https://github.com/s8y",
-    "linkText": "@s8y",
+    "url": "https://github.com/sudotman",
+    "linkText": "@sudotman",
     "x": -1060,
     "y": -60,
     "tags": ["social"]
