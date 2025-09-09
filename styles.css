@@ -67,8 +67,8 @@ body::before {
 .entry .title { font-family: "Space Grotesk", Inter, sans-serif; font-size: 14px; letter-spacing: 0.02em; color: var(--muted); margin-bottom: 8px; }
 
 .entry.image img { display: block; width: 100%; height: auto; border-radius: 12px; }
-.entry.text { max-width: 420px; }
-.entry.text .content { font-size: 16px; line-height: 1.6; }
+.entry.text { max-width: 520px; }
+.entry.text .content { font-size: 16px; line-height: 1.6; white-space: pre-wrap; }
 .entry.link a { color: var(--fg); text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.2); }
 .entry.link a:hover { border-color: var(--accent); color: var(--accent); }
 .entry.text_link a { color: var(--accent); }
@@ -79,5 +79,10 @@ body::before {
 @media (max-width: 700px) {
   .entry { max-width: min(86vw, 520px); padding: 10px; }
 }
+
+/* lightbox */
+#lightbox[hidden] { display: none; }
+#lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: grid; place-items: center; z-index: 20; cursor: zoom-out; backdrop-filter: blur(2px); }
+#lightboxImg { max-width: 92vw; max-height: 92vh; border-radius: 12px; box-shadow: 0 10px 50px rgba(0,0,0,0.5); }
 
 

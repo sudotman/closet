@@ -35,4 +35,12 @@ Interactions:
 Design:
 - Monotone, glassy cards over a subtle grid; space-grotesque accents.
 
+CMS (Decap):
+- Visit `/admin` to log in and edit entries.
+- Configure GitHub auth via Netlify Identity or your own OAuth app:
+  1) Create a Netlify site (any), enable Identity, enable Git Gateway.
+  2) In `admin/config.yml`, keep `base_url` and `auth_endpoint` as provided.
+  3) Alternatively, set up a GitHub OAuth proxy and update `backend` accordingly.
+- Media uploads go to `/uploads`.
+
 

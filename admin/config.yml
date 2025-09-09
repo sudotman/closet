@@ -1,0 +1,43 @@
+backend:
+  name: github
+  repo: sudotman/closet
+  branch: main
+  base_url: https://api.netlify.com
+  auth_endpoint: /auth
+
+local_backend: true
+
+media_folder: "uploads"
+public_folder: "/uploads"
+
+publish_mode: editorial_workflow
+
+collections:
+  - name: "entries"
+    label: "Entries"
+    label_singular: "Entry"
+    description: "Canvas items"
+    editor:
+      preview: false
+    files:
+      - name: "entries"
+        label: "Entries JSON"
+        file: "entries.json"
+        format: "json"
+        fields:
+          - { label: "Entries", name: "root", widget: "list", label_singular: "Entry", collapsed: true, fields: [
+              { label: "ID", name: "id", widget: "string" },
+              { label: "Type", name: "type", widget: "select", options: ["image","text","link","text_link","youtube"] },
+              { label: "Title", name: "title", widget: "string", required: false },
+              { label: "X", name: "x", widget: "number" },
+              { label: "Y", name: "y", widget: "number" },
+              { label: "Tags", name: "tags", widget: "list", required: false },
+              { label: "Image src", name: "src", widget: "image", required: false },
+              { label: "Alt", name: "alt", widget: "string", required: false },
+              { label: "Text", name: "text", widget: "text", required: false },
+              { label: "URL", name: "url", widget: "string", required: false },
+              { label: "Link Text", name: "linkText", widget: "string", required: false },
+              { label: "YouTube ID", name: "youtubeId", widget: "string", required: false }
+            ] }
+
+

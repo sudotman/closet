@@ -31,6 +31,15 @@
   {
     "id": "yt-piece",
     "type": "youtube",
+    "title": "defect gi",
+    "youtubeId": "w3VeKnW9cNo",
+    "x": 200,
+    "y": 220,
+    "tags": ["video"]
+  },
+  {
+    "id": "yt-piece",
+    "type": "youtube",
     "title": "party4u",
     "youtubeId": "agu22bqGHto",
     "x": 200,

@@ -4,6 +4,8 @@
   const world = document.getElementById('world');
   const searchInput = document.getElementById('searchInput');
   const searchResults = document.getElementById('searchResults');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightboxImg');
 
   const state = {
     panX: 0,
@@ -103,6 +105,11 @@
         const img = document.createElement('img');
         img.src = entry.src;
         img.alt = entry.alt || entry.title || '';
+        img.addEventListener('click', (e) => {
+          e.stopPropagation();
+          lightboxImg.src = entry.src;
+          lightbox.removeAttribute('hidden');
+        });
         contentEl = img;
       } else if (entry.type === 'text') {
         const text = document.createElement('div');
@@ -235,11 +242,24 @@
 
     // data
     const res = await fetch('entries.json', { cache: 'no-store' });
-    const entries = await res.json();
+    const json = await res.json();
+    const entries = Array.isArray(json) ? json : (json.root || []);
     state.entries = entries;
     renderEntries(entries);
     const start = computeInitialPanToCenter(entries);
     state.panX = start.x; state.panY = start.y; setWorldTransform(state.panX, state.panY);
+
+    // lightbox interactions
+    lightbox.addEventListener('click', () => {
+      lightbox.setAttribute('hidden', '');
+      lightboxImg.src = '';
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !lightbox.hasAttribute('hidden')) {
+        lightbox.setAttribute('hidden', '');
+        lightboxImg.src = '';
+      }
+    });
   }
 
   window.addEventListener('load', init);
