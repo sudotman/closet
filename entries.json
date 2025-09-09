@@ -147,7 +147,51 @@
       "type": "link",
       "linkText": "strudel.cc",
       "url": "https://strudel.cc/",
-      "title": "cyber music type shit <3"
+      "title": "cyber music type shit <3",
+      "tags": [
+        "cyber",
+        "music"
+      ]
+    },
+    {
+      "type": "link",
+      "linkText": "vert.sh",
+      "url": "https://vert.sh//",
+      "title": "open-source converter - any file to any file.",
+      "tags": [
+        "cyber",
+        "useful"
+      ]
+    },
+    {
+      "type": "link",
+      "linkText": "cobalt.tools",
+      "url": "https://cobalt.tools/",
+      "title": "download any video from any platform.\n for youtube, https://cobalt.meowing.de/.",
+      "tags": [
+        "cyber",
+        "useful"
+      ]
+    },
+    {
+      "type": "link",
+      "linkText": "lookmovie",
+      "url": "https://ww1.lookmovie.pn/",
+      "title": "hosts films on their server - has paywalled HD but rare finds are available.",
+      "tags": [
+        "cyber",
+        "useful"
+      ]
+    },
+    {
+      "type": "link",
+      "linkText": "rivestream",
+      "url": "https://rivestream.org/",
+      "title": "servers aggregator - decent UI.",
+      "tags": [
+        "cyber",
+        "useful"
+      ]
     }
   ]
 }
