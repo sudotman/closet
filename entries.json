@@ -131,6 +131,23 @@
       ],
       "x": 0,
       "y": 0
+    },
+    {
+      "type": "image",
+      "title": "expert from albert maltz's work",
+      "src": "/uploads/albert-maltz-writers.jpeg",
+      "tags": [
+        "philosophy",
+        "reading"
+      ],
+      "url": "https://www.marxists.org/history/erol/1946-1956/maltz/maltz-what-ask-writers.pdf",
+      "linkText": "\"what shall we ask of writers?\""
+    },
+    {
+      "type": "link",
+      "linkText": "strudel.cc",
+      "url": "https://strudel.cc/",
+      "title": "cyber music type shit <3"
     }
   ]
 }
