@@ -4,6 +4,7 @@
   const world = document.getElementById('world');
   const searchInput = document.getElementById('searchInput');
   const searchResults = document.getElementById('searchResults');
+  const shuffleBtn = document.getElementById('shuffleBtn');
   const lightbox = document.getElementById('lightbox');
   const lightboxImg = document.getElementById('lightboxImg');
 
@@ -17,6 +18,13 @@
     startPanY: 0,
     entries: [],
     entryIdToEl: new Map(),
+  };
+
+  const LAYOUT = {
+    columnWidth: 420, // card width in px (fits youtube); others scale within
+    gap: 60,          // gap between cards in px
+    minCols: 2,
+    maxCols: 8,
   };
 
   function setWorldTransform(x, y) {
@@ -93,6 +101,7 @@
       card.style.left = `${entry.x}px`;
       card.style.top = `${entry.y}px`;
       card.dataset.id = entry.id;
+      card.dataset.uid = entry.__uid;
 
       const title = document.createElement('div');
       title.className = 'title';
@@ -110,6 +119,7 @@
           lightboxImg.src = entry.src;
           lightbox.removeAttribute('hidden');
         });
+        img.addEventListener('load', scheduleRelayout);
         contentEl = img;
       } else if (entry.type === 'text') {
         const text = document.createElement('div');
@@ -141,6 +151,7 @@
         iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
         iframe.allowFullscreen = true;
         iframe.src = `https://www.youtube-nocookie.com/embed/${entry.youtubeId}`;
+        iframe.addEventListener('load', scheduleRelayout);
         contentEl = iframe;
       }
 
@@ -150,11 +161,136 @@
       card.addEventListener('click', (e) => {
         // ignore deep clicks on links so navigation works
         if (e.target && (e.target.tagName === 'A' || e.target.tagName === 'IFRAME' || e.target.closest('a'))) return;
-        centerOnEntry(entry.id);
+        centerOnEntry(entry.__uid);
       });
 
       world.appendChild(card);
-      state.entryIdToEl.set(entry.id, card);
+      state.entryIdToEl.set(entry.__uid, card);
+    }
+  }
+
+  function debounce(fn, wait) {
+    let t = null;
+    return function (...args) {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), wait);
+    };
+  }
+
+  function measureAndAssignPositions(entries, { shuffle = false } = {}) {
+    const vp = viewport.getBoundingClientRect();
+    const gapX = LAYOUT.gap;
+    const gapY = LAYOUT.gap + 20; // extra vertical breathing room
+    const effectiveCardWidth = Math.min(LAYOUT.columnWidth, Math.floor(vp.width * 0.86));
+    const columns = Math.max(
+      LAYOUT.minCols,
+      Math.min(LAYOUT.maxCols, Math.floor((vp.width - gapX) / (effectiveCardWidth + gapX)) || 1)
+    );
+
+    const totalWidth = columns * effectiveCardWidth + (columns - 1) * gapX;
+    const xStart = -totalWidth / 2;
+    const colHeights = new Array(columns).fill(0);
+
+    const order = shuffle ? [...entries].sort(() => Math.random() - 0.5) : [...entries];
+
+    for (const entry of order) {
+      const el = state.entryIdToEl.get(entry.__uid);
+      if (!el) continue;
+      el.style.width = `${effectiveCardWidth}px`;
+      const rect = el.getBoundingClientRect();
+      const height = rect.height;
+
+      // pick shortest column
+      let colIndex = 0;
+      for (let i = 1; i < columns; i++) {
+        if (colHeights[i] < colHeights[colIndex]) colIndex = i;
+      }
+      const x = Math.round(xStart + colIndex * (effectiveCardWidth + gapX));
+      const y = Math.round(colHeights[colIndex]);
+
+      entry.x = x;
+      entry.y = y;
+      colHeights[colIndex] += height + gapY;
+    }
+  }
+
+  function computePanToCenterFromDOM(entries) {
+    if (!entries.length) return { x: 0, y: 0 };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const e of entries) {
+      const el = state.entryIdToEl.get(e.__uid);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      minX = Math.min(minX, e.x);
+      minY = Math.min(minY, e.y);
+      maxX = Math.max(maxX, e.x + w);
+      maxY = Math.max(maxY, e.y + h);
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const vp = viewport.getBoundingClientRect();
+    return { x: vp.width / 2 - cx, y: vp.height / 2 - cy };
+  }
+
+  function layoutAndApply(entries, opts) {
+    measureAndAssignPositions(entries, opts);
+    applyPositions(entries);
+  }
+
+  const scheduleRelayout = debounce(() => {
+    if (!state.entries.length) return;
+    layoutAndApply(state.entries);
+  }, 60);
+
+  function approximateSizeForEntry(entry) {
+    // Rough dimensions used for layout spacing and centering
+    const width = entry.type === 'youtube' ? 420 : 360; // px content width
+    const height = entry.type === 'image' ? 260 : (entry.type === 'youtube' ? 236 : 180);
+    return { width, height };
+  }
+
+  function assignPositions(entries, { shuffle = false } = {}) {
+    const vp = viewport.getBoundingClientRect();
+    const baseColumnWidth = 460; // column width including typical padding
+    const gap = 60; // spacing between cards
+    const maxCols = 6;
+    const minCols = 2;
+    const columns = Math.max(minCols, Math.min(maxCols, Math.floor((vp.width - gap) / (baseColumnWidth + gap)) || 3));
+
+    const totalWidth = columns * baseColumnWidth + (columns - 1) * gap;
+    const xStart = -totalWidth / 2; // center around 0
+    const colHeights = new Array(columns).fill(0);
+
+    const items = shuffle ? [...entries].sort(() => Math.random() - 0.5) : [...entries];
+
+    for (const entry of items) {
+      const { width, height } = approximateSizeForEntry(entry);
+      // find column with smallest accumulated height
+      let colIndex = 0;
+      let minH = colHeights[0];
+      for (let i = 1; i < columns; i++) {
+        if (colHeights[i] < minH) { minH = colHeights[i]; colIndex = i; }
+      }
+      const colX = xStart + colIndex * (baseColumnWidth + gap);
+      const insetX = (baseColumnWidth - width) / 2; // center narrower cards in the column
+      const x = Math.round(colX + insetX);
+      const y = Math.round(colHeights[colIndex]);
+
+      entry.x = x;
+      entry.y = y;
+
+      colHeights[colIndex] += height + gap;
+    }
+  }
+
+  function applyPositions(entries) {
+    for (const entry of entries) {
+      const el = state.entryIdToEl.get(entry.__uid);
+      if (!el) continue;
+      el.style.left = `${entry.x}px`;
+      el.style.top = `${entry.y}px`;
     }
   }
 
@@ -203,7 +339,7 @@
       li.appendChild(title);
       li.appendChild(type);
       li.addEventListener('click', () => {
-        centerOnEntry(e.id);
+        centerOnEntry(e.__uid);
         searchResults.classList.remove('show');
       });
       searchResults.appendChild(li);
@@ -231,7 +367,7 @@
             const inText = (en.text || '').toLowerCase().includes(q);
             return inTitle || inTags || inText;
           })[idx];
-          if (match) centerOnEntry(match.id);
+          if (match) centerOnEntry(match.__uid);
           searchResults.classList.remove('show');
         }
       } else if (e.key === 'Escape') {
@@ -244,9 +380,12 @@
     const res = await fetch('entries.json', { cache: 'no-store' });
     const json = await res.json();
     const entries = Array.isArray(json) ? json : (json.root || []);
+    entries.forEach((e, i) => { e.__uid = `${e.id || 'item'}__${i}`; });
     state.entries = entries;
     renderEntries(entries);
-    const start = computeInitialPanToCenter(entries);
+    // First layout pass after DOM nodes exist (uses measured heights)
+    layoutAndApply(entries, { shuffle: false });
+    const start = computePanToCenterFromDOM(entries);
     state.panX = start.x; state.panY = start.y; setWorldTransform(state.panX, state.panY);
 
     // lightbox interactions
@@ -260,6 +399,15 @@
         lightboxImg.src = '';
       }
     });
+
+    if (shuffleBtn) {
+      shuffleBtn.addEventListener('click', () => {
+        layoutAndApply(state.entries, { shuffle: true });
+      });
+    }
+
+    // relayout on resize
+    window.addEventListener('resize', scheduleRelayout);
   }
 
   window.addEventListener('load', init);

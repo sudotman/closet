@@ -1,100 +1,100 @@
-[
-  {
-    "id": "img-mountain",
-    "type": "image",
-    "title": "alpine breath",
-    "src": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop",
-    "alt": "mountains",
-    "x": -900,
-    "y": -300,
-    "tags": ["photo", "nature"]
-  },
-  {
-    "id": "text-haiku",
-    "type": "text",
-    "title": "small words",
-    "text": "wind on steel\nlonely elevators sing\nnight folds inward",
-    "x": -200,
-    "y": -520,
-    "tags": ["poem", "haiku"]
-  },
-  {
-    "id": "link-portfolio",
-    "type": "link",
-    "title": "portfolio",
-    "url": "https://satyamkashyap.com",
-    "linkText": "satyamkashyap.com",
-    "x": 420,
-    "y": -380,
-    "tags": ["link", "work"]
-  },
-  {
-    "id": "yt-piece",
-    "type": "youtube",
-    "title": "defect gi",
-    "youtubeId": "w3VeKnW9cNo",
-    "x": 200,
-    "y": 220,
-    "tags": ["video"]
-  },
-  {
-    "id": "yt-piece",
-    "type": "youtube",
-    "title": "fills my heart everytime I see this",
-    "youtubeId": "ROIGX9zaRbk",
-    "x": 200,
-    "y": 220,
-    "tags": ["video"]
-  },
-  {
-    "id": "yt-piece",
-    "type": "youtube",
-    "title": "party4u",
-    "youtubeId": "agu22bqGHto",
-    "x": 200,
-    "y": 220,
-    "tags": ["video"]
-  },
-  {
-    "id": "textlink-paper",
-    "type": "text_link",
-    "title": "paper",
-    "text": "my favorite paper on simplicity",
-    "url": "https://ciechanow.ski",
-    "linkText": "ciechanow.ski",
-    "x": -640,
-    "y": 240,
-    "tags": ["reading"]
-  },
-  {
-    "id": "img-chair",
-    "type": "image",
-    "title": "a chair that waits",
-    "src": "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=1600&auto=format&fit=crop",
-    "alt": "chair",
-    "x": -60,
-    "y": -40,
-    "tags": ["object", "design"]
-  },
-  {
-    "id": "text-note",
-    "type": "text",
-    "title": "note",
-    "text": "less is always more.",
-    "x": 760,
-    "y": 40,
-    "tags": ["note"]
-  },
-  {
-    "id": "link-github",
-    "type": "link",
-    "title": "github",
-    "url": "https://github.com/sudotman",
-    "linkText": "@sudotman",
-    "x": -1060,
-    "y": -60,
-    "tags": ["social"]
-  }
-]
-
-
+{
+  "root": [
+    {
+      "id": "img-mountain",
+      "type": "image",
+      "title": "alpine breath",
+      "src": "https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop",
+      "alt": "mountains",
+      "x": -900,
+      "y": -300,
+      "tags": ["photo", "nature"]
+    },
+    {
+      "id": "text-haiku",
+      "type": "text",
+      "title": "small words",
+      "text": "you shall bow\nas has everyone\nas they always do",
+      "x": -200,
+      "y": -520,
+      "tags": ["poem", "haiku"]
+    },
+    {
+      "id": "link-portfolio",
+      "type": "link",
+      "title": "portfolio",
+      "url": "https://satyamkashyap.com",
+      "linkText": "satyamkashyap.com",
+      "x": 420,
+      "y": -380,
+      "tags": ["link", "work"]
+    },
+    {
+      "id": "yt-defect-gi",
+      "type": "youtube",
+      "title": "defect gi",
+      "youtubeId": "w3VeKnW9cNo",
+      "x": 200,
+      "y": 220,
+      "tags": ["video"]
+    },
+    {
+      "id": "yt-heart",
+      "type": "youtube",
+      "title": "fills my heart everytime I see this",
+      "youtubeId": "ROIGX9zaRbk",
+      "x": 200,
+      "y": 220,
+      "tags": ["video"]
+    },
+    {
+      "id": "yt-party4u",
+      "type": "youtube",
+      "title": "party4u",
+      "youtubeId": "agu22bqGHto",
+      "x": 200,
+      "y": 220,
+      "tags": ["video"]
+    },
+    {
+      "id": "textlink-paper",
+      "type": "text_link",
+      "title": "paper",
+      "text": "my favorite paper on simplicity",
+      "url": "https://ciechanow.ski",
+      "linkText": "ciechanow.ski",
+      "x": -640,
+      "y": 240,
+      "tags": ["reading"]
+    },
+    {
+      "id": "img-chair",
+      "type": "image",
+      "title": "the meaning",
+      "src": "https://media.licdn.com/dms/image/v2/D5622AQE7TxLpvtN-6g/feedshare-shrink_1280/B56ZdtG5B8HEAk-/0/1749882212947?e=2147483647&v=beta&t=ykJE_WBPEb-0hQmO1allQRtUofyz7F8vDDZfQShK-nM",
+      "alt": "chair",
+      "x": -60,
+      "y": -40,
+      "tags": ["life", "philosophy", "wisdom"]
+    },
+    {
+      "id": "text-note",
+      "type": "text",
+      "title": "note",
+      "text": "less is always more.",
+      "x": 760,
+      "y": 40,
+      "tags": ["note"]
+    },
+    {
+      "id": "link-github",
+      "type": "link",
+      "title": "github",
+      "url": "https://github.com/sudotman",
+      "linkText": "@sudotman",
+      "x": -1060,
+      "y": -60,
+      "tags": ["social"]
+    }
+  ]
+}

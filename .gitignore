@@ -1,4 +1,6 @@
-uploads/
+# keep uploads committed so CMS media works; ignore only OS cruft
+.DS_Store
+Thumbs.db
 .DS_Store
 Thumbs.db
 
