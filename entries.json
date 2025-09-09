@@ -192,6 +192,53 @@
         "cyber",
         "useful"
       ]
+    },    
+    {
+      "id": "yt-margin-call",
+      "type": "youtube",
+      "title": "fire sale - 2008",
+      "youtubeId": "6D7KVozqRvk",
+      "x": 200,
+      "y": 220,
+      "tags": [
+        "video"
+      ]
+    },
+    {
+      "type": "youtube",
+      "title": "a love letter to donkey kong country",
+      "youtubeId": "IwEyob2jmXI",
+      "x": 200,
+      "y": 220,
+      "tags": [
+        "video",
+        "art"
+      ]
+    },
+    {
+      "type": "image",
+      "title": "precisely when",
+      "src": "/uploads/seven_samurai.jfif",
+      "x": 200,
+      "y": 220,
+      "tags": [
+        "photo",
+        "life",
+        "philosophy",
+        "art"
+      ]
+    },
+    {
+      "type": "text",
+      "title": "we have to",
+      "text": "we have to declare holy war against what we see every single day on the television.\n - herzog",
+      "x": 200,
+      "y": 220,
+      "tags": [
+        "wisdom",
+        "life",
+        "philosophy"
+      ]
     }
   ]
 }
