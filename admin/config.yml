@@ -1,9 +1,9 @@
 backend:
-  name: github
-  repo: sudotman/closet
+  name: git-gateway
   branch: main
-  base_url: https://api.netlify.com
-  auth_endpoint: /auth
+  # IMPORTANT: replace REPLACE_WITH_YOUR_NETLIFY_SITE with your Netlify site name
+  identity_url: https://closet-api-towards.netlify.app/.netlify/identity
+  gateway_url: https://closet-api-towards.netlify.app/.netlify/git
 
 local_backend: true
 
