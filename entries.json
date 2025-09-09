@@ -8,7 +8,10 @@
       "alt": "mountains",
       "x": -900,
       "y": -300,
-      "tags": ["photo", "nature"]
+      "tags": [
+        "photo",
+        "nature"
+      ]
     },
     {
       "id": "text-haiku",
@@ -17,7 +20,10 @@
       "text": "you shall bow\nas has everyone\nas they always do",
       "x": -200,
       "y": -520,
-      "tags": ["poem", "haiku"]
+      "tags": [
+        "poem",
+        "haiku"
+      ]
     },
     {
       "id": "link-portfolio",
@@ -27,7 +33,10 @@
       "linkText": "satyamkashyap.com",
       "x": 420,
       "y": -380,
-      "tags": ["link", "work"]
+      "tags": [
+        "link",
+        "work"
+      ]
     },
     {
       "id": "yt-defect-gi",
@@ -36,7 +45,9 @@
       "youtubeId": "w3VeKnW9cNo",
       "x": 200,
       "y": 220,
-      "tags": ["video"]
+      "tags": [
+        "video"
+      ]
     },
     {
       "id": "yt-heart",
@@ -45,7 +56,9 @@
       "youtubeId": "ROIGX9zaRbk",
       "x": 200,
       "y": 220,
-      "tags": ["video"]
+      "tags": [
+        "video"
+      ]
     },
     {
       "id": "yt-party4u",
@@ -54,18 +67,22 @@
       "youtubeId": "agu22bqGHto",
       "x": 200,
       "y": 220,
-      "tags": ["video"]
+      "tags": [
+        "video"
+      ]
     },
     {
-      "id": "textlink-paper",
-      "type": "text_link",
-      "title": "paper",
+      "linkText": "ciechanow.ski",
       "text": "my favorite paper on simplicity",
       "url": "https://ciechanow.ski",
-      "linkText": "ciechanow.ski",
       "x": -640,
+      "title": "paper",
+      "tags": [
+        "reading"
+      ],
       "y": 240,
-      "tags": ["reading"]
+      "type": "text_link",
+      "id": "textlink-paper"
     },
     {
       "id": "img-chair",
@@ -75,7 +92,11 @@
       "alt": "chair",
       "x": -60,
       "y": -40,
-      "tags": ["life", "philosophy", "wisdom"]
+      "tags": [
+        "life",
+        "philosophy",
+        "wisdom"
+      ]
     },
     {
       "id": "text-note",
@@ -84,7 +105,9 @@
       "text": "less is always more.",
       "x": 760,
       "y": 40,
-      "tags": ["note"]
+      "tags": [
+        "note"
+      ]
     },
     {
       "id": "link-github",
@@ -94,7 +117,20 @@
       "linkText": "@sudotman",
       "x": -1060,
       "y": -60,
-      "tags": ["social"]
+      "tags": [
+        "social"
+      ]
+    },
+    {
+      "id": "pahari-embodiment",
+      "src": "/uploads/outer_siraji_satyam_image.jpeg",
+      "type": "image",
+      "title": "i love my himalayan nest <3",
+      "tags": [
+        "home"
+      ],
+      "x": 0,
+      "y": 0
     }
   ]
 }
