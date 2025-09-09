@@ -25,7 +25,7 @@ collections:
         file: "entries.json"
         format: "json"
         fields:
-          - { label: "Entries", name: "root", widget: "list", label_singular: "Entry", collapsed: true, fields: [
+          - { label: "Entries", name: "root", widget: "list", label_singular: "Entry", collapsed: true, summary: "{{fields.title}} · {{fields.type}}", fields: [
               { label: "Type", name: "type", widget: "select", options: ["image","text","link","text_link","youtube"] },
               { label: "Title", name: "title", widget: "string", required: false },
               { label: "Text", name: "text", widget: "text", required: false },
