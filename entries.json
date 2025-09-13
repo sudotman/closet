@@ -239,6 +239,16 @@
         "life",
         "philosophy"
       ]
+    },
+    {
+      "type": "link",
+      "linkText": "1shows",
+      "url": "https://www.1shows.ru/",
+      "title": "piracy for shows - has some intrusive ads",
+      "tags": [
+        "cyber",
+        "useful"
+      ]
     }
   ]
 }
