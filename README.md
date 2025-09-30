@@ -42,5 +42,4 @@ CMS (Decap):
   2) In `admin/config.yml`, keep `base_url` and `auth_endpoint` as provided.
   3) Alternatively, set up a GitHub OAuth proxy and update `backend` accordingly.
 - Media uploads go to `/uploads`.
-
-
+- Manually navigate to admin/#/collections/entries post succesful login - this is a weird bug that needs to be fixed.
