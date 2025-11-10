@@ -11,13 +11,24 @@
   const state = {
     panX: 0,
     panY: 0,
+    targetPanX: 0,
+    targetPanY: 0,
+    rafId: null,
     isDragging: false,
+    dragMoved: false,
+    justDragged: false,
     startX: 0,
     startY: 0,
     startPanX: 0,
     startPanY: 0,
+    lastPointerX: 0,
+    lastPointerY: 0,
+    lastPointerT: 0,
+    vx: 0,
+    vy: 0,
     entries: [],
     entryIdToEl: new Map(),
+    activeUid: null,
   };
 
   const LAYOUT = {
@@ -36,43 +47,100 @@
     const path = ev.composedPath ? ev.composedPath() : ev.path || [];
     const interactive = path.some((el) => el && el.tagName && ['INPUT','A','BUTTON','TEXTAREA','IFRAME'].includes(el.tagName));
     if (interactive) return;
+    // prevent native text selection and image dragging
+    ev.preventDefault();
+    if (window.getSelection && typeof window.getSelection().removeAllRanges === 'function') {
+      try { window.getSelection().removeAllRanges(); } catch (_) {}
+    }
     state.isDragging = true;
+    state.dragMoved = false;
+    state.justDragged = false;
     viewport.classList.add('dragging');
     state.startX = ev.clientX;
     state.startY = ev.clientY;
     state.startPanX = state.panX;
     state.startPanY = state.panY;
+    state.lastPointerX = ev.clientX;
+    state.lastPointerY = ev.clientY;
+    state.lastPointerT = performance.now();
+    state.vx = 0; state.vy = 0;
+    state.targetPanX = state.panX;
+    state.targetPanY = state.panY;
+    ensureRenderLoop();
   }
 
   function onPointerMove(ev) {
     if (!state.isDragging) return;
+    ev.preventDefault();
     const dx = ev.clientX - state.startX;
     const dy = ev.clientY - state.startY;
-    state.panX = state.startPanX + dx;
-    state.panY = state.startPanY + dy;
-    setWorldTransform(state.panX, state.panY);
+    if (!state.dragMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+      state.dragMoved = true;
+    }
+    state.targetPanX = state.startPanX + dx;
+    state.targetPanY = state.startPanY + dy;
+    const now = performance.now();
+    const dt = Math.max(1, now - state.lastPointerT);
+    const vX = (ev.clientX - state.lastPointerX) / dt;
+    const vY = (ev.clientY - state.lastPointerY) / dt;
+    state.vx = vX * 16;
+    state.vy = vY * 16;
+    state.lastPointerX = ev.clientX;
+    state.lastPointerY = ev.clientY;
+    state.lastPointerT = now;
+    ensureRenderLoop();
   }
 
   function onPointerUp() {
+    const wasDragging = state.isDragging;
+    const moved = state.dragMoved;
     state.isDragging = false;
     viewport.classList.remove('dragging');
+    // briefly suppress click actions that may fire after a drag release
+    if (wasDragging && moved) {
+      state.justDragged = true;
+      setTimeout(() => { state.justDragged = false; }, 120);
+    }
+    ensureRenderLoop();
   }
 
   function lerp(a, b, t) { return a + (b - a) * t; }
 
-  function animatePanTo(targetX, targetY, duration = 420) {
-    const startX = state.panX;
-    const startY = state.panY;
-    const startTime = performance.now();
-    function frame(now) {
-      const p = Math.min(1, (now - startTime) / duration);
-      const ease = p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p; // easeInOutQuad
-      state.panX = lerp(startX, targetX, ease);
-      state.panY = lerp(startY, targetY, ease);
+  // Elastic smoothing and inertia render loop
+  function ensureRenderLoop() {
+    if (state.rafId != null) return;
+    const SMOOTHING = 0.18;
+    const FRICTION = 0.86;
+    const EPS = 0.05;
+    function step() {
+      // advance target by inertial velocity
+      if (Math.abs(state.vx) > EPS || Math.abs(state.vy) > EPS) {
+        state.targetPanX += state.vx;
+        state.targetPanY += state.vy;
+        state.vx *= FRICTION;
+        state.vy *= FRICTION;
+      } else {
+        state.vx = state.vy = 0;
+      }
+      // smooth current pan towards target
+      state.panX = lerp(state.panX, state.targetPanX, SMOOTHING);
+      state.panY = lerp(state.panY, state.targetPanY, SMOOTHING);
       setWorldTransform(state.panX, state.panY);
-      if (p < 1) requestAnimationFrame(frame);
+      const nearTarget = Math.abs(state.panX - state.targetPanX) < 0.3 && Math.abs(state.panY - state.targetPanY) < 0.3;
+      const stillMoving = state.isDragging || Math.abs(state.vx) > EPS || Math.abs(state.vy) > EPS;
+      if (!stillMoving && nearTarget) {
+        state.rafId = null;
+        return;
+      }
+      state.rafId = requestAnimationFrame(step);
     }
-    requestAnimationFrame(frame);
+    state.rafId = requestAnimationFrame(step);
+  }
+
+  function animatePanTo(targetX, targetY) {
+    state.targetPanX = targetX;
+    state.targetPanY = targetY;
+    ensureRenderLoop();
   }
 
   function centerOnEntry(entryId) {
@@ -114,8 +182,12 @@
         const img = document.createElement('img');
         img.src = entry.src;
         img.alt = entry.alt || entry.title || '';
+        // avoid native drag-image ghosting
+        img.draggable = false;
         img.addEventListener('click', (e) => {
           e.stopPropagation();
+          // ignore clicks that immediately follow a drag
+          if (state.isDragging || state.dragMoved || state.justDragged) return;
           lightboxImg.src = entry.src;
           lightbox.removeAttribute('hidden');
         });
@@ -157,12 +229,8 @@
 
       if (contentEl) card.appendChild(contentEl);
 
-      // click to center
-      card.addEventListener('click', (e) => {
-        // ignore deep clicks on links so navigation works
-        if (e.target && (e.target.tagName === 'A' || e.target.tagName === 'IFRAME' || e.target.closest('a'))) return;
-        centerOnEntry(entry.__uid);
-      });
+      // NOTE: Previously, clicking a card centered the view. This is disabled to
+      // keep dragging responsive and avoid accidental recenters.
 
       world.appendChild(card);
       state.entryIdToEl.set(entry.__uid, card);
@@ -353,6 +421,8 @@
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
+    // block native dragstart on any descendants (images/links)
+    window.addEventListener('dragstart', (e) => { e.preventDefault(); }, { capture: true });
 
     searchInput.addEventListener('input', (e) => updateSearchResults(e.target.value));
     searchInput.addEventListener('keydown', (e) => {
@@ -387,6 +457,7 @@
     layoutAndApply(entries, { shuffle: false });
     const start = computePanToCenterFromDOM(entries);
     state.panX = start.x; state.panY = start.y; setWorldTransform(state.panX, state.panY);
+    state.targetPanX = state.panX; state.targetPanY = state.panY;
 
     // lightbox interactions
     lightbox.addEventListener('click', () => {
@@ -411,6 +482,134 @@
   }
 
   window.addEventListener('load', init);
+
+  function onWheel(ev) {
+    // allow pinch-zoom gestures/etc to pass if ctrlKey (browser zoom)
+    if (ev.ctrlKey) return;
+    ev.preventDefault();
+    // accumulate velocity; invert so wheel direction feels natural
+    const scale = 1; // can tune for sensitivity
+    const dx = -ev.deltaX * scale;
+    const dy = -ev.deltaY * scale;
+    state.vx += dx;
+    state.vy += dy;
+    ensureRenderLoop();
+  }
+  // attach non-passive so we can preventDefault
+  document.addEventListener('wheel', onWheel, { passive: false });
+
+  // Keyboard navigation between entries and Ctrl/Cmd+K for search
+  function getEntryCenters() {
+    const list = [];
+    for (const e of state.entries) {
+      const el = state.entryIdToEl.get(e.__uid);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      list.push({ uid: e.__uid, x: e.x + w / 2, y: e.y + h / 2, w, h });
+    }
+    return list;
+  }
+
+  function getWorldViewportCenter() {
+    const vp = viewport.getBoundingClientRect();
+    return { x: vp.width / 2 - state.panX, y: vp.height / 2 - state.panY };
+  }
+
+  function pickInitialActive() {
+    const centers = getEntryCenters();
+    if (!centers.length) return null;
+    const c = getWorldViewportCenter();
+    let best = centers[0], bestD2 = Infinity;
+    for (const it of centers) {
+      const dx = it.x - c.x;
+      const dy = it.y - c.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; best = it; }
+    }
+    return best?.uid || null;
+  }
+
+  function moveFocus(direction) {
+    if (!state.entries.length) return;
+    if (!state.activeUid) {
+      state.activeUid = pickInitialActive();
+      if (state.activeUid) centerOnEntry(state.activeUid);
+      return;
+    }
+    const centers = getEntryCenters();
+    const current = centers.find(c => c.uid === state.activeUid);
+    if (!current) {
+      state.activeUid = pickInitialActive();
+      if (state.activeUid) centerOnEntry(state.activeUid);
+      return;
+    }
+    const dir = {
+      left:  { x: -1, y:  0 },
+      right: { x:  1, y:  0 },
+      up:    { x:  0, y: -1 },
+      down:  { x:  0, y:  1 },
+    }[direction];
+    if (!dir) return;
+    let best = null;
+    let bestScore = Infinity;
+    for (const it of centers) {
+      if (it.uid === current.uid) continue;
+      const dx = it.x - current.x;
+      const dy = it.y - current.y;
+      const dot = dx * dir.x + dy * dir.y;
+      if (dot <= 0) continue; // only consider items in the intended direction
+      // favor alignment in the chosen axis
+      const axisPenalty = (dir.x !== 0 ? Math.abs(dy) : Math.abs(dx));
+      const dist = Math.hypot(dx, dy);
+      const score = dist + axisPenalty * 0.5;
+      if (score < bestScore) { bestScore = score; best = it; }
+    }
+    if (!best) {
+      // wrap: pick nearest overall in that direction from viewport center
+      const c = getWorldViewportCenter();
+      let wrapBest = null, wrapScore = Infinity;
+      for (const it of centers) {
+        const dx = it.x - c.x;
+        const dy = it.y - c.y;
+        const dot = dx * dir.x + dy * dir.y;
+        if (dot <= 0) continue;
+        const axisPenalty = (dir.x !== 0 ? Math.abs(dy) : Math.abs(dx));
+        const dist = Math.hypot(dx, dy);
+        const score = dist + axisPenalty * 0.5;
+        if (score < wrapScore) { wrapScore = score; wrapBest = it; }
+      }
+      best = wrapBest;
+    }
+    if (best) {
+      state.activeUid = best.uid;
+      centerOnEntry(best.uid);
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    // Ignore when typing in inputs or when lightbox is open
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    const isEditing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement && document.activeElement.isContentEditable);
+    const lightboxOpen = !lightbox.hasAttribute('hidden');
+    if (lightboxOpen) return;
+
+    // Ctrl/Cmd+K to focus search
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+      searchResults.classList.add('show');
+      return;
+    }
+    if (isEditing) return;
+
+    if (e.key === 'ArrowLeft') { e.preventDefault(); moveFocus('left'); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); moveFocus('right'); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveFocus('up'); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus('down'); }
+  });
 })();
 
 
