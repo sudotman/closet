@@ -253,6 +253,15 @@
         "philosophy",
         "wisdom"
       ]
+    },
+    {
+      "type": "text",
+      "title": "grigori perelman",
+      "text": "i'm not interested in money or fame, I don't want to be on display like an animal in a zoo. i'm not a hero of mathematics.",
+      "tags": [
+        "life",
+        "philosophy"
+      ]
     }
   ]
 }
