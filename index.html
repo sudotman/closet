@@ -13,13 +13,34 @@
   </head>
   <body>
     <div id="ui">
-      <div class="brand">closet</div>
+      <a class="brand" href="https://closet-api-towards.netlify.app/admin/#/collections/entries" target="_blank" rel="noopener noreferrer">closet</a>
       <div class="search">
         <input id="searchInput" type="text" placeholder="search…" autocomplete="off" spellcheck="false" />
         <ul id="searchResults" class="results" aria-label="search results"></ul>
       </div>
+      <div class="filters-row">
+        <div class="filters">
+          <div id="tagPills" class="tag-pills" aria-label="filter by tag"></div>
+          <select id="sortSelect" aria-label="sort entries">
+            <option value="original">original order</option>
+            <option value="title">title (a→z)</option>
+            <option value="type">type</option>
+          </select>
+        </div>
+      </div>
       <div class="help">drag to explore · enter to jump</div>
       <button id="shuffleBtn" class="shuffle-btn" title="Shuffle layout">shuffle</button>
+      <div id="viewSlider" class="view-slider" aria-label="view mode slider">
+        <div class="track">
+          <div class="fill"></div>
+          <div class="thumb"></div>
+        </div>
+        <div class="labels">
+          <span data-mode="grid">grid</span>
+          <span data-mode="list">list</span>
+          <span data-mode="compact">compact</span>
+        </div>
+      </div>
     </div>
 
     <div id="viewport" aria-label="canvas viewport">

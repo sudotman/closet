@@ -27,8 +27,11 @@
     vx: 0,
     vy: 0,
     entries: [],
+    viewEntries: [],
     entryIdToEl: new Map(),
     activeUid: null,
+    viewMode: 'grid',
+    selectedTags: [],
   };
 
   const LAYOUT = {
@@ -178,10 +181,12 @@
       if (entry.title) card.appendChild(title);
 
       let contentEl = null;
+      let bodyEl = null;
       if (entry.type === 'image') {
         const img = document.createElement('img');
         img.src = entry.src;
         img.alt = entry.alt || entry.title || '';
+        img.loading = 'lazy';
         // avoid native drag-image ghosting
         img.draggable = false;
         img.addEventListener('click', (e) => {
@@ -222,12 +227,62 @@
         const iframe = document.createElement('iframe');
         iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
         iframe.allowFullscreen = true;
+        iframe.loading = 'lazy';
         iframe.src = `https://www.youtube-nocookie.com/embed/${entry.youtubeId}`;
         iframe.addEventListener('load', scheduleRelayout);
         contentEl = iframe;
       }
 
-      if (contentEl) card.appendChild(contentEl);
+      if (state.viewMode === 'compact') {
+        card.classList.add('compact', 'collapsed');
+        const summary = document.createElement('div');
+        summary.className = 'summary';
+        const titleWrap = document.createElement('div');
+        titleWrap.className = 'title';
+        titleWrap.textContent = entry.title || entry.linkText || entry.url || entry.text || entry.id;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const type = document.createElement('span');
+        type.textContent = entry.type;
+        meta.appendChild(type);
+        if (entry.tags && entry.tags.length) {
+          for (const t of entry.tags) {
+            const tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.textContent = t;
+            meta.appendChild(tag);
+          }
+        }
+        summary.appendChild(titleWrap);
+        summary.appendChild(meta);
+        card.appendChild(summary);
+
+        bodyEl = document.createElement('div');
+        bodyEl.className = 'body';
+        if (entry.title) bodyEl.appendChild(title);
+        if (contentEl) bodyEl.appendChild(contentEl);
+        card.appendChild(bodyEl);
+
+        card.addEventListener('click', (e) => {
+          if (state.isDragging || state.dragMoved || state.justDragged) return;
+          // ignore link clicks inside
+          if (e.target && (e.target.tagName === 'A' || e.target.closest('a'))) return;
+          card.classList.toggle('expanded');
+          if (card.classList.contains('expanded')) {
+            card.classList.remove('collapsed');
+            bodyEl.style.display = 'block';
+          } else {
+            card.classList.add('collapsed');
+            bodyEl.style.display = 'none';
+          }
+          scheduleRelayout();
+        });
+        // start collapsed
+        if (bodyEl) bodyEl.style.display = 'none';
+      } else {
+        if (entry.title) card.appendChild(title);
+        if (contentEl) card.appendChild(contentEl);
+      }
 
       // NOTE: Previously, clicking a card centered the view. This is disabled to
       // keep dragging responsive and avoid accidental recenters.
@@ -247,38 +302,70 @@
 
   function measureAndAssignPositions(entries, { shuffle = false } = {}) {
     const vp = viewport.getBoundingClientRect();
-    const gapX = LAYOUT.gap;
-    const gapY = LAYOUT.gap + 20; // extra vertical breathing room
-    const effectiveCardWidth = Math.min(LAYOUT.columnWidth, Math.floor(vp.width * 0.86));
-    const columns = Math.max(
-      LAYOUT.minCols,
-      Math.min(LAYOUT.maxCols, Math.floor((vp.width - gapX) / (effectiveCardWidth + gapX)) || 1)
-    );
-
-    const totalWidth = columns * effectiveCardWidth + (columns - 1) * gapX;
-    const xStart = -totalWidth / 2;
-    const colHeights = new Array(columns).fill(0);
-
     const order = shuffle ? [...entries].sort(() => Math.random() - 0.5) : [...entries];
 
-    for (const entry of order) {
-      const el = state.entryIdToEl.get(entry.__uid);
-      if (!el) continue;
-      el.style.width = `${effectiveCardWidth}px`;
-      const rect = el.getBoundingClientRect();
-      const height = rect.height;
-
-      // pick shortest column
-      let colIndex = 0;
-      for (let i = 1; i < columns; i++) {
-        if (colHeights[i] < colHeights[colIndex]) colIndex = i;
+    if (state.viewMode === 'list') {
+      const listWidth = Math.min(720, Math.floor(vp.width * 0.9));
+      let y = 0;
+      const gapY = 26;
+      for (const entry of order) {
+        const el = state.entryIdToEl.get(entry.__uid);
+        if (!el) continue;
+        el.style.width = `${listWidth}px`;
+        const rect = el.getBoundingClientRect();
+        const height = rect.height;
+        const x = Math.round(-listWidth / 2);
+        entry.x = x;
+        entry.y = Math.round(y);
+        y += height + gapY;
       }
-      const x = Math.round(xStart + colIndex * (effectiveCardWidth + gapX));
-      const y = Math.round(colHeights[colIndex]);
+    } else if (state.viewMode === 'compact') {
+      const tableWidth = Math.min(900, Math.floor(vp.width * 0.95));
+      let y = 0;
+      const rowGap = 14;
+      for (const entry of order) {
+        const el = state.entryIdToEl.get(entry.__uid);
+        if (!el) continue;
+        el.style.width = `${tableWidth}px`;
+        const rect = el.getBoundingClientRect();
+        const height = rect.height;
+        const x = Math.round(-tableWidth / 2);
+        entry.x = x;
+        entry.y = Math.round(y);
+        y += height + rowGap;
+      }
+    } else {
+      const gapX = LAYOUT.gap;
+      const gapY = LAYOUT.gap + 20; // extra vertical breathing room
+      const effectiveCardWidth = Math.min(LAYOUT.columnWidth, Math.floor(vp.width * 0.86));
+      const columns = Math.max(
+        LAYOUT.minCols,
+        Math.min(LAYOUT.maxCols, Math.floor((vp.width - gapX) / (effectiveCardWidth + gapX)) || 1)
+      );
 
-      entry.x = x;
-      entry.y = y;
-      colHeights[colIndex] += height + gapY;
+      const totalWidth = columns * effectiveCardWidth + (columns - 1) * gapX;
+      const xStart = -totalWidth / 2;
+      const colHeights = new Array(columns).fill(0);
+
+      for (const entry of order) {
+        const el = state.entryIdToEl.get(entry.__uid);
+        if (!el) continue;
+        el.style.width = `${effectiveCardWidth}px`;
+        const rect = el.getBoundingClientRect();
+        const height = rect.height;
+
+        // pick shortest column
+        let colIndex = 0;
+        for (let i = 1; i < columns; i++) {
+          if (colHeights[i] < colHeights[colIndex]) colIndex = i;
+        }
+        const x = Math.round(xStart + colIndex * (effectiveCardWidth + gapX));
+        const y = Math.round(colHeights[colIndex]);
+
+        entry.x = x;
+        entry.y = y;
+        colHeights[colIndex] += height + gapY;
+      }
     }
   }
 
@@ -308,8 +395,8 @@
   }
 
   const scheduleRelayout = debounce(() => {
-    if (!state.entries.length) return;
-    layoutAndApply(state.entries);
+    if (!state.viewEntries.length) return;
+    layoutAndApply(state.viewEntries);
   }, 60);
 
   function approximateSizeForEntry(entry) {
@@ -452,10 +539,11 @@
     const entries = Array.isArray(json) ? json : (json.root || []);
     entries.forEach((e, i) => { e.__uid = `${e.id || 'item'}__${i}`; });
     state.entries = entries;
-    renderEntries(entries);
+    state.viewEntries = entries;
+    renderEntries(state.viewEntries);
     // First layout pass after DOM nodes exist (uses measured heights)
-    layoutAndApply(entries, { shuffle: false });
-    const start = computePanToCenterFromDOM(entries);
+    layoutAndApply(state.viewEntries, { shuffle: false });
+    const start = computePanToCenterFromDOM(state.viewEntries);
     state.panX = start.x; state.panY = start.y; setWorldTransform(state.panX, state.panY);
     state.targetPanX = state.panX; state.targetPanY = state.panY;
 
@@ -471,11 +559,175 @@
       }
     });
 
+    const modes = ['grid', 'list', 'compact'];
+    const viewSlider = document.getElementById('viewSlider');
+    const trackEl = viewSlider ? viewSlider.querySelector('.track') : null;
+    const thumbEl = viewSlider ? viewSlider.querySelector('.thumb') : null;
+    const fillEl = viewSlider ? viewSlider.querySelector('.fill') : null;
+    const labelEls = viewSlider ? Array.from(viewSlider.querySelectorAll('.labels span')) : [];
+
+    function updateSliderVisual(mode) {
+      if (!viewSlider || !trackEl || !thumbEl || !fillEl) return;
+      const idx = Math.max(0, modes.indexOf(mode));
+      const steps = modes.length - 1 || 1;
+      const pct = (idx / steps) * 100;
+      thumbEl.style.left = `${pct}%`;
+      fillEl.style.width = `${pct}%`;
+      labelEls.forEach((el, i) => el.classList.toggle('active', i === idx));
+    }
+
+    function applyFiltersAndRender({ shuffle = false, recenter = true } = {}) {
+      const sortSelect = document.getElementById('sortSelect');
+      let list = state.entries;
+      const effectiveTags = state.selectedTags || [];
+      if (effectiveTags.length) {
+        list = list.filter(e => {
+          const tags = e.tags || [];
+          return tags.some(t => effectiveTags.includes(t));
+        });
+      }
+      const sortVal = sortSelect ? sortSelect.value : 'original';
+      list = [...list];
+      if (sortVal === 'title') {
+        list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      } else if (sortVal === 'type') {
+        list.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
+      }
+      state.viewEntries = list;
+      renderEntries(state.viewEntries);
+      layoutAndApply(state.viewEntries, { shuffle });
+      updateSliderVisual(state.viewMode);
+      if (recenter) {
+        const center = computePanToCenterFromDOM(state.viewEntries);
+        animatePanTo(center.x, center.y);
+      }
+    }
+
     if (shuffleBtn) {
       shuffleBtn.addEventListener('click', () => {
-        layoutAndApply(state.entries, { shuffle: true });
+        layoutAndApply(state.viewEntries, { shuffle: true });
       });
     }
+
+    function setViewMode(mode, { recenter = true } = {}) {
+      if (!modes.includes(mode)) return;
+      state.viewMode = mode;
+      applyFiltersAndRender({ shuffle: false, recenter });
+    }
+
+    if (viewSlider && trackEl && thumbEl) {
+      let dragging = false;
+      function modeFromClientX(clientX) {
+        const rect = trackEl.getBoundingClientRect();
+        const clampedX = Math.min(Math.max(clientX, rect.left), rect.right);
+        const steps = modes.length - 1 || 1;
+        const ratio = (clampedX - rect.left) / (rect.width || 1);
+        const idx = Math.round(ratio * steps);
+        return modes[idx];
+      }
+      function pointerMove(ev) {
+        if (!dragging) return;
+        ev.preventDefault();
+        const mode = modeFromClientX(ev.clientX);
+        setViewMode(mode, { recenter: true });
+      }
+      trackEl.addEventListener('pointerdown', (ev) => {
+        dragging = true;
+        const mode = modeFromClientX(ev.clientX);
+        setViewMode(mode, { recenter: true });
+        window.addEventListener('pointermove', pointerMove);
+        window.addEventListener('pointerup', () => {
+          dragging = false;
+          window.removeEventListener('pointermove', pointerMove);
+        }, { once: true });
+      });
+      thumbEl.addEventListener('pointerdown', (ev) => {
+        dragging = true;
+        ev.preventDefault();
+        window.addEventListener('pointermove', pointerMove);
+        window.addEventListener('pointerup', () => {
+          dragging = false;
+          window.removeEventListener('pointermove', pointerMove);
+        }, { once: true });
+      });
+      labelEls.forEach((el) => {
+        el.addEventListener('click', () => {
+          const mode = el.dataset.mode;
+          setViewMode(mode, { recenter: true });
+        });
+      });
+      updateSliderVisual(state.viewMode);
+    }
+
+    const sortSelectEl = document.getElementById('sortSelect');
+    const tagPillsEl = document.getElementById('tagPills');
+    function rebuildTagPills() {
+      if (!tagPillsEl) return;
+      tagPillsEl.innerHTML = '';
+      const tagSet = new Set();
+      for (const e of state.entries) {
+        (e.tags || []).forEach(t => tagSet.add(t));
+      }
+      const tagsSorted = Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+      const allPill = document.createElement('button');
+      allPill.type = 'button';
+      allPill.className = 'tag-pill';
+      if (!state.selectedTags.length) allPill.classList.add('active');
+      allPill.textContent = 'all tags';
+      allPill.addEventListener('click', () => {
+        state.selectedTags = [];
+        rebuildTagPills();
+        applyFiltersAndRender({ shuffle: false, recenter: true });
+      });
+      tagPillsEl.appendChild(allPill);
+      for (const t of tagsSorted) {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'tag-pill';
+        if (state.selectedTags.includes(t)) pill.classList.add('active');
+        pill.textContent = t;
+        pill.addEventListener('click', () => {
+          if (state.selectedTags.includes(t)) {
+            state.selectedTags = state.selectedTags.filter(x => x !== t);
+          } else {
+            state.selectedTags = [...state.selectedTags, t];
+          }
+          rebuildTagPills();
+          applyFiltersAndRender({ shuffle: false, recenter: true });
+        });
+        tagPillsEl.appendChild(pill);
+      }
+      // enable wheel and drag scrolling (prevent bubbling to viewport)
+      tagPillsEl.addEventListener('wheel', (e) => {
+        if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
+          tagPillsEl.scrollLeft += e.deltaY;
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, { passive: false });
+      let dragging = false;
+      let dragStartX = 0;
+      let scrollStart = 0;
+      tagPillsEl.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        dragStartX = e.clientX;
+        scrollStart = tagPillsEl.scrollLeft;
+      });
+      window.addEventListener('pointerup', () => { dragging = false; });
+      window.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - dragStartX;
+        tagPillsEl.scrollLeft = scrollStart - dx;
+      });
+    }
+
+    rebuildTagPills();
+    if (sortSelectEl) {
+      sortSelectEl.addEventListener('change', () => applyFiltersAndRender({ shuffle: false, recenter: true }));
+    }
+
+    // initial apply to ensure any filters/sort/view take effect
+    applyFiltersAndRender({ shuffle: false, recenter: false });
 
     // relayout on resize
     window.addEventListener('resize', scheduleRelayout);
@@ -488,9 +740,10 @@
     if (ev.ctrlKey) return;
     ev.preventDefault();
     // accumulate velocity; invert so wheel direction feels natural
-    const scale = 1; // can tune for sensitivity
-    const dx = -ev.deltaX * scale;
-    const dy = -ev.deltaY * scale;
+    const scale = 0.45; // reduced sensitivity for smoother feel
+    const clamp = 40;   // cap large deltas from fast wheels/trackpads
+    const dx = -Math.sign(ev.deltaX) * Math.min(Math.abs(ev.deltaX), clamp) * scale;
+    const dy = -Math.sign(ev.deltaY) * Math.min(Math.abs(ev.deltaY), clamp) * scale;
     state.vx += dx;
     state.vy += dy;
     ensureRenderLoop();
@@ -501,7 +754,7 @@
   // Keyboard navigation between entries and Ctrl/Cmd+K for search
   function getEntryCenters() {
     const list = [];
-    for (const e of state.entries) {
+    for (const e of state.viewEntries) {
       const el = state.entryIdToEl.get(e.__uid);
       if (!el) continue;
       const rect = el.getBoundingClientRect();
