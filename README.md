@@ -2,6 +2,10 @@
 
 A subtle, draggable canvas of things. Built for GitHub Pages.
 
+**[Explore the closet](https://closet.satyam.lol/)**
+
+![The closet's draggable spatial archive](docs/images/closet-overview.jpg)
+
 Local preview:
 
 ```bash
