@@ -5,71 +5,71 @@
       "type": "text",
       "title": "small words",
       "text": "you shall bow\nas has everyone\nas they always do",
-      "x": -200,
-      "y": -520,
       "tags": [
         "poem",
         "haiku"
-      ]
+      ],
+      "x": -200,
+      "y": -520
     },
     {
       "id": "link-portfolio",
       "type": "link",
       "title": "portfolio",
-      "url": "https://satyamkashyap.com",
-      "linkText": "satyamkashyap.com",
-      "x": 420,
-      "y": -380,
+      "url": "https://satyam.lol",
+      "linkText": "satyam.lol",
       "tags": [
         "link",
         "work"
-      ]
+      ],
+      "x": 420,
+      "y": -380
     },
     {
       "id": "yt-defect-gi",
       "type": "youtube",
       "title": "defect gi",
       "youtubeId": "w3VeKnW9cNo",
-      "x": 200,
-      "y": 220,
       "tags": [
         "video"
-      ]
+      ],
+      "x": 200,
+      "y": 220
     },
     {
       "id": "yt-heart",
       "type": "youtube",
       "title": "fills my heart everytime I see this",
       "youtubeId": "ROIGX9zaRbk",
-      "x": 200,
-      "y": 220,
       "tags": [
         "video"
-      ]
+      ],
+      "x": 200,
+      "y": 220
     },
     {
       "id": "yt-party4u",
       "type": "youtube",
       "title": "party4u",
       "youtubeId": "agu22bqGHto",
-      "x": 200,
-      "y": 220,
       "tags": [
         "video"
-      ]
+      ],
+      "x": 200,
+      "y": 220
     },
     {
-      "linkText": "carcinization.blog",
+      "id": "textlink-paper",
+      "type": "text_link",
+      "title": "paper",
       "text": "my favorite paper on carcinization ;)",
       "url": "https://blog.satyamkashyap.com/2025/07/carcinization-on-internet.html",
-      "x": -640,
-      "title": "paper",
+      "linkText": "carcinization.blog",
       "tags": [
         "reading"
       ],
-      "y": 240,
-      "type": "text_link",
-      "id": "textlink-paper"
+      "x": -640,
+      "y": 240
     },
     {
       "id": "img-chair",
@@ -77,24 +77,24 @@
       "title": "the meaning",
       "src": "/uploads/sometimes-you-mix-the-past-with-the-present-and-your-happiness-disappears..jpg",
       "alt": "chair",
-      "x": -60,
-      "y": -40,
       "tags": [
         "life",
         "philosophy",
         "wisdom"
-      ]
+      ],
+      "x": -60,
+      "y": -40
     },
     {
       "id": "text-note",
       "type": "text",
       "title": "note",
       "text": "less is always more.",
-      "x": 760,
-      "y": 40,
       "tags": [
         "note"
-      ]
+      ],
+      "x": 760,
+      "y": 40
     },
     {
       "id": "link-github",
@@ -102,17 +102,17 @@
       "title": "github",
       "url": "https://github.com/sudotman",
       "linkText": "@sudotman",
-      "x": -1060,
-      "y": -60,
       "tags": [
         "social"
-      ]
+      ],
+      "x": -1060,
+      "y": -60
     },
     {
       "id": "pahari-embodiment",
-      "src": "/uploads/outer_siraji_satyam_image.jpeg",
       "type": "image",
       "title": "i love my himalayan nest <3",
+      "src": "/uploads/outer_siraji_satyam_image.jpeg",
       "tags": [
         "home"
       ],
@@ -120,61 +120,67 @@
       "y": 0
     },
     {
+      "id": "expert-from-albert-maltz-s-work",
       "type": "image",
       "title": "expert from albert maltz's work",
+      "url": "https://www.marxists.org/history/erol/1946-1956/maltz/maltz-what-ask-writers.pdf",
+      "linkText": "\"what shall we ask of writers?\"",
       "src": "/uploads/albert-maltz-writers.jpeg",
       "tags": [
         "philosophy",
         "reading"
-      ],
-      "url": "https://www.marxists.org/history/erol/1946-1956/maltz/maltz-what-ask-writers.pdf",
-      "linkText": "\"what shall we ask of writers?\""
+      ]
     },
     {
+      "id": "cyber-music-type-shit-3",
       "type": "link",
-      "linkText": "strudel.cc",
-      "url": "https://strudel.cc/",
       "title": "cyber music type shit <3",
+      "url": "https://strudel.cc/",
+      "linkText": "strudel.cc",
       "tags": [
         "cyber",
         "music"
       ]
     },
     {
+      "id": "open-source-converter-any-file-to-any-file",
       "type": "link",
-      "linkText": "vert.sh",
-      "url": "https://vert.sh//",
       "title": "open-source converter - any file to any file.",
+      "url": "https://vert.sh//",
+      "linkText": "vert.sh",
       "tags": [
         "cyber",
         "useful"
       ]
     },
     {
+      "id": "download-any-video-from-any-platform-for-youtube",
       "type": "link",
-      "linkText": "cobalt.tools",
-      "url": "https://cobalt.tools/",
       "title": "download any video from any platform.\n for youtube, https://cobalt.meowing.de/.",
+      "url": "https://cobalt.tools/",
+      "linkText": "cobalt.tools",
       "tags": [
         "cyber",
         "useful"
       ]
     },
     {
+      "id": "hosts-films-on-their-server-has-paywalled-hd-but",
       "type": "link",
-      "linkText": "lookmovie",
-      "url": "https://ww1.lookmovie.pn/",
       "title": "hosts films on their server - has paywalled HD but rare finds are available.",
+      "url": "https://ww1.lookmovie.pn/",
+      "linkText": "lookmovie",
       "tags": [
         "cyber",
         "useful"
       ]
     },
     {
+      "id": "servers-aggregator-decent-ui",
       "type": "link",
-      "linkText": "rivestream",
-      "url": "https://rivestream.org/",
       "title": "servers aggregator - decent UI.",
+      "url": "https://rivestream.org/",
+      "linkText": "rivestream",
       "tags": [
         "cyber",
         "useful"
@@ -185,65 +191,71 @@
       "type": "youtube",
       "title": "fire sale - 2008",
       "youtubeId": "6D7KVozqRvk",
-      "x": 200,
-      "y": 220,
       "tags": [
         "video"
-      ]
+      ],
+      "x": 200,
+      "y": 220
     },
     {
+      "id": "a-love-letter-to-donkey-kong-country",
       "type": "youtube",
       "title": "a love letter to donkey kong country",
       "youtubeId": "IwEyob2jmXI",
-      "x": 200,
-      "y": 220,
       "tags": [
         "video",
         "art"
-      ]
+      ],
+      "x": 200,
+      "y": 220
     },
     {
+      "id": "precisely-when",
       "type": "image",
       "title": "precisely when",
       "src": "/uploads/seven_samurai.jfif",
-      "x": 200,
-      "y": 220,
       "tags": [
         "photo",
         "life",
         "philosophy",
         "art",
         "wisdom"
-      ]
+      ],
+      "x": 200,
+      "y": 220
     },
     {
+      "id": "we-have-to",
       "type": "text",
       "title": "we have to",
       "text": "we have to declare holy war against what we see every single day on the television.\n - herzog",
-      "x": 200,
-      "y": 220,
       "tags": [
         "wisdom",
         "life",
         "philosophy"
-      ]
+      ],
+      "x": 200,
+      "y": 220
     },
     {
+      "id": "piracy-for-shows-has-some-intrusive-ads",
       "type": "link",
-      "linkText": "1shows",
-      "url": "https://www.1shows.ru/",
       "title": "piracy for shows - has some intrusive ads",
+      "url": "https://www.1shows.ru/",
+      "linkText": "1shows",
       "tags": [
         "cyber",
         "useful"
       ]
     },
     {
+      "id": "india",
       "type": "text",
       "title": "india",
       "text": "article 51a(h) of the indian constitution"
     },
     {
+      "id": "i-maintain-an-idempotent-approach-to-life",
       "type": "text",
       "title": "i maintain an idempotent approach to life",
       "text": "for everything is idempotent if you really think about it\nfor anxiety shall cease to exist if you think about it",
@@ -255,6 +267,7 @@
       ]
     },
     {
+      "id": "grigori-perelman",
       "type": "text",
       "title": "grigori perelman",
       "text": "i'm not interested in money or fame, I don't want to be on display like an animal in a zoo. i'm not a hero of mathematics.",
