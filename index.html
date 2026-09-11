@@ -2,68 +2,145 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>closet · satyam k</title>
     <meta name="description" content="A drifting canvas of things by Satyam Kashyap." />
+    <meta name="theme-color" content="#060608" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="closet · satyam k" />
+    <meta property="og:description" content="A drifting canvas of things by Satyam Kashyap." />
+    <meta property="og:url" content="https://closet.satyam.lol/" />
+    <meta name="twitter:card" content="summary" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="card.css" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   </head>
   <body>
-    <div id="ui">
-      <a class="brand" href="https://closet-api-towards.netlify.app/admin/#/collections/entries" target="_blank" rel="noopener noreferrer">closet</a>
-      <div class="search">
-        <input id="searchInput" type="text" placeholder="search…" autocomplete="off" spellcheck="false" />
-        <ul id="searchResults" class="results" aria-label="search results"></ul>
+    <a class="skip-link" href="#consolePanel">skip to index</a>
+
+    <!-- the room: a grid that scales and slides with the canvas -->
+    <div id="grid" class="grid" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <main id="viewport" class="viewport" aria-label="canvas">
+      <div id="world" class="world"></div>
+    </main>
+
+    <!-- state overlay: loading / empty / error -->
+    <div id="status" class="status" role="status" aria-live="polite" hidden>
+      <p class="status__line u-mono" id="statusLine"></p>
+      <p class="status__note" id="statusNote"></p>
+      <button class="ghost-btn" id="statusAction" hidden></button>
+    </div>
+
+    <!-- the catalogue drawer -->
+    <aside id="console" class="console" data-open="true">
+      <div class="console__bar">
+        <a class="wordmark" href="admin/" title="open the console">closet</a>
+        <span class="console__count u-mono" id="count" aria-live="polite"></span>
+        <button
+          type="button"
+          id="consoleToggle"
+          class="console__toggle"
+          aria-expanded="true"
+          aria-controls="consolePanel"
+          title="collapse the index"
+        ><span class="console__toggle-bars" aria-hidden="true"></span></button>
       </div>
-      <div class="filters-row">
-        <div class="filters">
-          <div id="tagPills" class="tag-pills" aria-label="filter by tag"></div>
-          <select id="sortSelect" aria-label="sort entries">
-            <option value="original">original order</option>
-            <option value="title">title (a→z)</option>
-            <option value="type">type</option>
-          </select>
+
+      <div class="console__panel" id="consolePanel">
+        <div class="search">
+          <input
+            id="q"
+            class="search__input"
+            type="search"
+            placeholder="search"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="search entries"
+            aria-controls="results"
+          />
+          <kbd class="search__kbd u-mono">⌘K</kbd>
         </div>
+        <ul id="results" class="results" aria-label="search results"></ul>
+
+        <section class="drawer">
+          <div class="drawer__head">
+            <span class="u-label">index</span>
+            <button type="button" class="drawer__clear u-mono" id="tagClear" hidden>clear</button>
+          </div>
+          <ul id="tagIndex" class="tag-index" aria-label="filter by tag"></ul>
+        </section>
+
+        <section class="drawer">
+          <div class="drawer__head"><span class="u-label">order</span></div>
+          <div class="seg" id="sortSeg" role="group" aria-label="sort order">
+            <button type="button" data-sort="original">entered</button>
+            <button type="button" data-sort="title">a–z</button>
+            <button type="button" data-sort="type">type</button>
+          </div>
+        </section>
       </div>
-      <div class="help">drag to explore · enter to jump</div>
-      <button id="shuffleBtn" class="shuffle-btn" title="Shuffle layout">shuffle</button>
-      <div id="viewSlider" class="view-slider" aria-label="view mode slider">
-        <div class="track">
-          <div class="fill"></div>
-          <div class="thumb"></div>
-        </div>
-        <div class="labels">
-          <span data-mode="grid">grid</span>
-          <span data-mode="list">list</span>
-          <span data-mode="compact">compact</span>
-        </div>
+    </aside>
+
+    <!-- bottom-left: how you look at it -->
+    <div id="dock" class="dock">
+      <div class="seg" id="viewSeg" role="group" aria-label="view mode">
+        <button type="button" data-view="grid">grid</button>
+        <button type="button" data-view="list">list</button>
+        <button type="button" data-view="compact">index</button>
+      </div>
+      <span class="dock__rule" aria-hidden="true"></span>
+      <button type="button" class="ghost-btn" id="shuffleBtn" title="re-deal the layout">shuffle</button>
+      <button type="button" class="ghost-btn" id="fitBtn" title="fit everything on screen (0)">fit</button>
+    </div>
+
+    <!-- bottom-right: where you are -->
+    <div id="hud" class="hud">
+      <span class="hud__coord u-mono" id="coord" aria-hidden="true"></span>
+      <div class="zoom">
+        <button type="button" class="zoom__btn" data-zoom="out" aria-label="zoom out">−</button>
+        <button type="button" class="zoom__val u-mono" id="zoomVal" title="reset zoom">100%</button>
+        <button type="button" class="zoom__btn" data-zoom="in" aria-label="zoom in">+</button>
       </div>
     </div>
 
-    <div id="viewport" aria-label="canvas viewport">
-      <div id="world" aria-label="canvas world"></div>
-    </div>
-    <div id="lightbox" aria-modal="true" role="dialog" aria-label="image viewer" hidden>
-      <img id="lightboxImg" alt="expanded" />
+    <button type="button" id="helpBtn" class="help-btn" aria-haspopup="dialog" title="shortcuts">?</button>
+
+    <div id="sheet" class="sheet" role="dialog" aria-modal="false" aria-label="keyboard shortcuts" hidden>
+      <div class="sheet__head">
+        <span class="u-label">shortcuts</span>
+        <button type="button" class="sheet__close" id="sheetClose" aria-label="close">×</button>
+      </div>
+      <dl class="sheet__list">
+        <div><dt><kbd>drag</kbd></dt><dd>pan the canvas</dd></div>
+        <div><dt><kbd>scroll</kbd></dt><dd>pan · <kbd>⌘</kbd>/<kbd>ctrl</kbd> scroll to zoom</dd></div>
+        <div><dt><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></dt><dd>step between entries</dd></div>
+        <div><dt><kbd>⏎</kbd></dt><dd>open the held entry</dd></div>
+        <div><dt><kbd>⌘K</kbd> <span class="sheet__or">or type</span></dt><dd>search</dd></div>
+        <div><dt><kbd>0</kbd></dt><dd>fit everything</dd></div>
+        <div><dt><kbd>+</kbd><kbd>−</kbd></dt><dd>zoom</dd></div>
+        <div><dt><kbd>\</kbd></dt><dd>collapse the index</dd></div>
+        <div><dt><kbd>esc</kbd></dt><dd>back out of anything</dd></div>
+      </dl>
     </div>
 
+    <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="image viewer" hidden>
+      <button type="button" class="lightbox__close" id="lightboxClose" aria-label="close">×</button>
+      <figure class="lightbox__figure">
+        <img id="lightboxImg" class="lightbox__img" alt="" />
+        <figcaption class="lightbox__cap" id="lightboxCap"></figcaption>
+      </figure>
+    </div>
+
+    <script src="card.js"></script>
     <script src="script.js"></script>
-    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    <script>
-      // Ensure OAuth callbacks landing on the Netlify domain are handled
-      if (window.netlifyIdentity) {
-        window.netlifyIdentity.init({
-          APIUrl: 'https://closet-api-towards.netlify.app/.netlify/identity'
-        });
-        window.netlifyIdentity.on('login', function () {
-          try { window.netlifyIdentity.close(); } catch (e) {}
-        });
-      }
-    </script>
   </body>
-  </html>
-
-
+</html>

@@ -1,65 +1,207 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>closet · admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>closet · console</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#060608" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../card.css" />
+    <link rel="stylesheet" href="admin.css" />
     <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
-    <style>
-      :root { color-scheme: dark light; }
-      html, body { height: 100%; margin: 0; }
-      body { font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
-    </style>
   </head>
   <body>
-    <!-- Decap CMS (manual init) -->
-    <script>window.CMS_MANUAL_INIT = true;</script>
-    <script src="https://unpkg.com/decap-cms@latest/dist/decap-cms.js?v=3"></script>
-    <script>
-      // Netlify Identity widget + explicit APIUrl so it doesn't call /.netlify/identity on this domain
-      (function() {
-        var s = document.createElement('script');
-        s.src = 'https://identity.netlify.com/v1/netlify-identity-widget.js';
-        s.async = true;
-        s.onload = function() {
-          if (window.netlifyIdentity) {
-            window.netlifyIdentity.init({
-              APIUrl: 'https://closet-api-towards.netlify.app/.netlify/identity'
-            });
-            function ensureFullNameLocal(user) {
-              try {
-                if (!user) return;
-                if (!user.user_metadata) user.user_metadata = {};
-                if (!user.user_metadata.full_name) {
-                  user.user_metadata.full_name = (user.email || '').split('@')[0] || 'user';
-                }
-              } catch (e) {}
-            }
-            function startCMS() {
-              if (window.CMS && typeof window.CMS.init === 'function') {
-                try { window.CMS.init(); } catch (e) { console.error('CMS init failed', e); }
-              }
-            }
-            window.netlifyIdentity.on('init', function(user){
-              ensureFullNameLocal(user);
-              startCMS();
-            });
-            window.netlifyIdentity.on('login', function(user){
-              ensureFullNameLocal(user);
-              try { window.netlifyIdentity.close(); } catch(e) {}
-              startCMS();
-            });
-            window.netlifyIdentity.on('logout', function(){
-              startCMS();
-            });
-            // If no identity events fire (e.g., guest), still init CMS
-            setTimeout(startCMS, 400);
-          }
-        };
-        document.body.appendChild(s);
-      })();
-    </script>
+    <!-- ============================ top bar ============================ -->
+    <header class="bar">
+      <a class="bar__mark" href="../" title="back to the canvas">closet</a>
+      <span class="bar__sep" aria-hidden="true"></span>
+      <span class="bar__where u-mono" id="barWhere">not connected</span>
+
+      <div class="bar__spacer"></div>
+
+      <span class="bar__dirty u-mono" id="barDirty" hidden></span>
+      <button type="button" class="btn" id="reloadBtn" hidden title="discard local edits and re-read from GitHub">reload</button>
+      <button type="button" class="btn btn--primary" id="publishBtn" hidden>publish</button>
+      <button type="button" class="btn" id="settingsBtn" title="connection settings">⚙</button>
+    </header>
+
+    <!-- ============================ gate ============================ -->
+    <section class="gate" id="gate">
+      <div class="gate__card">
+        <h1 class="gate__title">closet console</h1>
+        <p class="gate__lede">
+          Edits are written straight to GitHub from this page. Nothing runs in
+          between — no server, no third party. Your token is stored only in this
+          browser.
+        </p>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="u-label">owner</span>
+            <input id="cfgOwner" type="text" spellcheck="false" autocomplete="off" placeholder="sudotman" />
+          </label>
+          <label class="field">
+            <span class="u-label">repo</span>
+            <input id="cfgRepo" type="text" spellcheck="false" autocomplete="off" placeholder="closet" />
+          </label>
+          <label class="field field--sm">
+            <span class="u-label">branch</span>
+            <input id="cfgBranch" type="text" spellcheck="false" autocomplete="off" placeholder="main" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="u-label">personal access token</span>
+          <input id="cfgToken" type="password" spellcheck="false" autocomplete="off"
+                 placeholder="github_pat_… or ghp_…" />
+        </label>
+
+        <label class="check">
+          <input type="checkbox" id="cfgRemember" checked />
+          <span>keep me signed in on this browser</span>
+          <em>otherwise the token is forgotten when the tab closes</em>
+        </label>
+
+        <details class="note">
+          <summary>how to make a token</summary>
+          <ol>
+            <li>
+              Open
+              <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">
+                fine-grained tokens ↗
+              </a>
+              and pick this repository under <em>Repository access</em>.
+            </li>
+            <li>Under <em>Repository permissions</em>, set <strong>Contents</strong> to <em>Read and write</em>.</li>
+            <li>To open pull requests instead of committing directly, also set <strong>Pull requests</strong> to <em>Read and write</em>.</li>
+            <li>Generate it, copy it, paste it above. A classic token with the <code>repo</code> scope works too.</li>
+          </ol>
+          <p class="note__warn">
+            A token in a browser can be read by anything that can run script on this
+            page. Give it one repository and nothing more, and revoke it if you are
+            unsure.
+          </p>
+        </details>
+
+        <div class="gate__actions">
+          <button type="button" class="btn btn--primary" id="connectBtn">connect</button>
+          <button type="button" class="btn" id="offlineBtn">work offline</button>
+        </div>
+        <p class="gate__error" id="gateError" hidden></p>
+      </div>
+    </section>
+
+    <!-- ============================ workbench ============================ -->
+    <main class="work" id="work" hidden>
+      <!-- entries -->
+      <section class="pane pane--list" id="paneList">
+        <div class="pane__head">
+          <span class="u-label" title="drag a row by its grip, or alt + up/down">entries <b id="listCount" class="u-mono"></b></span>
+          <button type="button" class="btn btn--sm" id="addBtn">+ new</button>
+        </div>
+        <div class="pane__tools">
+          <input id="listFilter" class="input input--sm" type="search" placeholder="filter" spellcheck="false" />
+          <select id="listType" class="input input--sm" aria-label="filter by type">
+            <option value="">all types</option>
+          </select>
+        </div>
+        <ol class="list" id="list"></ol>
+        <p class="list__empty" id="listEmpty" hidden>nothing matches that filter</p>
+      </section>
+
+      <!-- editor -->
+      <section class="pane pane--edit" id="paneEdit">
+        <div class="pane__head">
+          <button type="button" class="btn btn--sm pane__back" id="backBtn">← entries</button>
+          <span class="u-label" id="editWhich">editing</span>
+          <div class="pane__head-spacer"></div>
+          <button type="button" class="btn btn--sm" id="dupBtn" title="duplicate">duplicate</button>
+          <button type="button" class="btn btn--sm btn--danger" id="delBtn" title="delete">delete</button>
+        </div>
+        <div class="editor" id="editor"></div>
+        <div class="editor__blank" id="editorBlank">
+          <p>Pick an entry on the left, or start a new one.</p>
+          <button type="button" class="btn" id="addBtn2">+ new entry</button>
+        </div>
+      </section>
+
+      <!-- preview -->
+      <section class="pane pane--preview" id="panePreview">
+        <div class="pane__head">
+          <span class="u-label">as it will look</span>
+          <div class="pane__head-spacer"></div>
+          <button type="button" class="btn btn--sm" id="jsonBtn" aria-pressed="false">json</button>
+        </div>
+        <div class="preview" id="preview"></div>
+        <pre class="json" id="jsonOut" hidden></pre>
+      </section>
+    </main>
+
+    <!-- ============================ publish sheet ============================ -->
+    <div class="scrim" id="scrim" hidden></div>
+
+    <section class="modal" id="publishModal" role="dialog" aria-modal="true" aria-label="publish changes" hidden>
+      <header class="modal__head">
+        <span class="u-label">review &amp; publish</span>
+        <button type="button" class="modal__close" data-close aria-label="close">×</button>
+      </header>
+
+      <div class="modal__body">
+        <div class="diff" id="diff"></div>
+
+        <label class="field" id="commitField">
+          <span class="u-label">commit message</span>
+          <input id="commitMsg" class="input" type="text" />
+        </label>
+
+        <div class="field" id="modeField">
+          <span class="u-label">how</span>
+          <div class="seg seg--wide" id="modeSeg" role="group">
+            <button type="button" data-mode="direct">commit to branch</button>
+            <button type="button" data-mode="pr">open a pull request</button>
+          </div>
+        </div>
+
+        <label class="field" id="prBranchField" hidden>
+          <span class="u-label">new branch name</span>
+          <input id="prBranch" class="input" type="text" spellcheck="false" />
+        </label>
+
+        <div class="log" id="publishLog" hidden></div>
+      </div>
+
+      <footer class="modal__foot">
+        <button type="button" class="btn" data-close>cancel</button>
+        <button type="button" class="btn btn--primary" id="confirmPublish">publish</button>
+      </footer>
+    </section>
+
+    <!-- ============================ settings sheet ============================ -->
+    <section class="modal modal--sm" id="settingsModal" role="dialog" aria-modal="true" aria-label="settings" hidden>
+      <header class="modal__head">
+        <span class="u-label">connection</span>
+        <button type="button" class="modal__close" data-close aria-label="close">×</button>
+      </header>
+      <div class="modal__body">
+        <dl class="facts" id="facts"></dl>
+        <div class="settings__actions">
+          <button type="button" class="btn" id="exportBtn">download entries.json</button>
+          <button type="button" class="btn" id="copyBtn">copy entries.json</button>
+          <button type="button" class="btn btn--danger" id="forgetBtn">forget token</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <script src="../card.js"></script>
+    <script src="github.js"></script>
+    <script src="admin.js"></script>
   </body>
-  </html>
-
-
+</html>

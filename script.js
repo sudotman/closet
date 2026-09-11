@@ -1,868 +1,1104 @@
-/* global window, document, requestAnimationFrame, fetch */
+/* ------------------------------------------------------------------
+   closet · script.js
+   A pan/zoom canvas over a masonry of cards.
+
+   Transform model:  screen = world * zoom + pan   (origin 0 0)
+   Everything measured in world units via offsetWidth/offsetHeight,
+   which are immune to the ancestor scale.
+   ------------------------------------------------------------------ */
 (function () {
-  const viewport = document.getElementById('viewport');
-  const world = document.getElementById('world');
-  const searchInput = document.getElementById('searchInput');
-  const searchResults = document.getElementById('searchResults');
-  const shuffleBtn = document.getElementById('shuffleBtn');
-  const lightbox = document.getElementById('lightbox');
-  const lightboxImg = document.getElementById('lightboxImg');
+  'use strict';
 
-  const state = {
-    panX: 0,
-    panY: 0,
-    targetPanX: 0,
-    targetPanY: 0,
-    rafId: null,
-    isDragging: false,
-    dragMoved: false,
-    justDragged: false,
-    startX: 0,
-    startY: 0,
-    startPanX: 0,
-    startPanY: 0,
-    lastPointerX: 0,
-    lastPointerY: 0,
-    lastPointerT: 0,
-    vx: 0,
-    vy: 0,
-    entries: [],
-    viewEntries: [],
-    entryIdToEl: new Map(),
+  var $ = function (id) { return document.getElementById(id); };
+  var Card = window.ClosetCard;
+
+  var viewport   = $('viewport');
+  var world      = $('world');
+  var gridEl     = $('grid');
+  var consoleEl  = $('console');
+  var qInput     = $('q');
+  var resultsEl  = $('results');
+  var tagIndexEl = $('tagIndex');
+  var tagClearEl = $('tagClear');
+  var countEl    = $('count');
+  var coordEl    = $('coord');
+  var zoomValEl  = $('zoomVal');
+  var statusEl   = $('status');
+  var statusLine = $('statusLine');
+  var statusNote = $('statusNote');
+  var statusBtn  = $('statusAction');
+  var sheetEl    = $('sheet');
+  var helpBtn    = $('helpBtn');
+  var lightbox   = $('lightbox');
+  var lightboxImg = $('lightboxImg');
+  var lightboxCap = $('lightboxCap');
+
+  var MIN_ZOOM = 0.22;
+  var MAX_ZOOM = 2.6;
+  var GRID_BASE = 28;
+  var VIEWS = ['grid', 'list', 'compact'];
+  var SORTS = ['original', 'title', 'type'];
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var state = {
+    entries: [],          // every entry, in file order
+    visible: [],          // what is on the canvas right now
+    nodes: new Map(),     // uid -> positioned .node element
+    view: 'grid',
+    sort: 'original',
+    tags: [],
+    query: '',
     activeUid: null,
-    viewMode: 'grid',
-    selectedTags: [],
+    cursor: -1,           // highlighted row in the results list
+    results: [],
+    pan: { x: 0, y: 0 },
+    panTarget: { x: 0, y: 0 },
+    zoom: 1,
+    zoomTarget: 1,
+    vel: { x: 0, y: 0 },
+    raf: null,
+    dragging: false,
+    moved: false,
+    suppressClick: false,
+    pointers: new Map(),
+    pinch: null,
+    touched: false   // has the reader taken over the view?
   };
 
-  const LAYOUT = {
-    columnWidth: 420, // card width in px (fits youtube); others scale within
-    gap: 60,          // gap between cards in px
-    minCols: 2,
-    maxCols: 8,
-  };
-
-  function setWorldTransform(x, y) {
-    world.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-  }
-
-  function onPointerDown(ev) {
-    // ignore drags starting from interactive elements
-    const path = ev.composedPath ? ev.composedPath() : ev.path || [];
-    const interactive = path.some((el) => el && el.tagName && ['INPUT','A','BUTTON','TEXTAREA','IFRAME'].includes(el.tagName));
-    if (interactive) return;
-    // prevent native text selection and image dragging
-    ev.preventDefault();
-    if (window.getSelection && typeof window.getSelection().removeAllRanges === 'function') {
-      try { window.getSelection().removeAllRanges(); } catch (_) {}
-    }
-    state.isDragging = true;
-    state.dragMoved = false;
-    state.justDragged = false;
-    viewport.classList.add('dragging');
-    state.startX = ev.clientX;
-    state.startY = ev.clientY;
-    state.startPanX = state.panX;
-    state.startPanY = state.panY;
-    state.lastPointerX = ev.clientX;
-    state.lastPointerY = ev.clientY;
-    state.lastPointerT = performance.now();
-    state.vx = 0; state.vy = 0;
-    state.targetPanX = state.panX;
-    state.targetPanY = state.panY;
-    ensureRenderLoop();
-  }
-
-  function onPointerMove(ev) {
-    if (!state.isDragging) return;
-    ev.preventDefault();
-    const dx = ev.clientX - state.startX;
-    const dy = ev.clientY - state.startY;
-    if (!state.dragMoved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-      state.dragMoved = true;
-    }
-    state.targetPanX = state.startPanX + dx;
-    state.targetPanY = state.startPanY + dy;
-    const now = performance.now();
-    const dt = Math.max(1, now - state.lastPointerT);
-    const vX = (ev.clientX - state.lastPointerX) / dt;
-    const vY = (ev.clientY - state.lastPointerY) / dt;
-    state.vx = vX * 16;
-    state.vy = vY * 16;
-    state.lastPointerX = ev.clientX;
-    state.lastPointerY = ev.clientY;
-    state.lastPointerT = now;
-    ensureRenderLoop();
-  }
-
-  function onPointerUp() {
-    const wasDragging = state.isDragging;
-    const moved = state.dragMoved;
-    state.isDragging = false;
-    viewport.classList.remove('dragging');
-    // briefly suppress click actions that may fire after a drag release
-    if (wasDragging && moved) {
-      state.justDragged = true;
-      setTimeout(() => { state.justDragged = false; }, 120);
-    }
-    ensureRenderLoop();
-  }
-
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
   function lerp(a, b, t) { return a + (b - a) * t; }
 
-  // Elastic smoothing and inertia render loop
-  function ensureRenderLoop() {
-    if (state.rafId != null) return;
-    const SMOOTHING = 0.18;
-    const FRICTION = 0.86;
-    const EPS = 0.05;
-    function step() {
-      // advance target by inertial velocity
-      if (Math.abs(state.vx) > EPS || Math.abs(state.vy) > EPS) {
-        state.targetPanX += state.vx;
-        state.targetPanY += state.vy;
-        state.vx *= FRICTION;
-        state.vy *= FRICTION;
-      } else {
-        state.vx = state.vy = 0;
-      }
-      // smooth current pan towards target
-      state.panX = lerp(state.panX, state.targetPanX, SMOOTHING);
-      state.panY = lerp(state.panY, state.targetPanY, SMOOTHING);
-      setWorldTransform(state.panX, state.panY);
-      const nearTarget = Math.abs(state.panX - state.targetPanX) < 0.3 && Math.abs(state.panY - state.targetPanY) < 0.3;
-      const stillMoving = state.isDragging || Math.abs(state.vx) > EPS || Math.abs(state.vy) > EPS;
-      if (!stillMoving && nearTarget) {
-        state.rafId = null;
-        return;
-      }
-      state.rafId = requestAnimationFrame(step);
-    }
-    state.rafId = requestAnimationFrame(step);
-  }
-
-  function animatePanTo(targetX, targetY) {
-    state.targetPanX = targetX;
-    state.targetPanY = targetY;
-    ensureRenderLoop();
-  }
-
-  function centerOnEntry(entryId) {
-    const el = state.entryIdToEl.get(entryId);
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const vp = viewport.getBoundingClientRect();
-    const currentWorldRect = world.getBoundingClientRect();
-    // compute element center relative to world origin
-    const elCenterXInWorld = rect.left - currentWorldRect.left + rect.width / 2;
-    const elCenterYInWorld = rect.top - currentWorldRect.top + rect.height / 2;
-    const vpCenterX = vp.width / 2;
-    const vpCenterY = vp.height / 2;
-    // target pan moves world so that element center aligns with viewport center
-    const targetX = vpCenterX - elCenterXInWorld;
-    const targetY = vpCenterY - elCenterYInWorld;
-    animatePanTo(targetX, targetY);
-  }
-
-  function renderEntries(entries) {
-    world.innerHTML = '';
-    state.entryIdToEl.clear();
-    for (const entry of entries) {
-      const card = document.createElement('div');
-      card.className = `entry ${entry.type}`;
-      card.style.left = `${entry.x}px`;
-      card.style.top = `${entry.y}px`;
-      card.dataset.id = entry.id;
-      card.dataset.uid = entry.__uid;
-
-      const title = document.createElement('div');
-      title.className = 'title';
-      title.textContent = entry.title || '';
-
-      if (entry.title) card.appendChild(title);
-
-      let contentEl = null;
-      let bodyEl = null;
-      if (entry.type === 'image') {
-        const img = document.createElement('img');
-        img.src = entry.src;
-        img.alt = entry.alt || entry.title || '';
-        img.loading = 'lazy';
-        // avoid native drag-image ghosting
-        img.draggable = false;
-        img.addEventListener('click', (e) => {
-          e.stopPropagation();
-          // ignore clicks that immediately follow a drag
-          if (state.isDragging || state.dragMoved || state.justDragged) return;
-          lightboxImg.src = entry.src;
-          lightbox.removeAttribute('hidden');
-        });
-        img.addEventListener('load', scheduleRelayout);
-        contentEl = img;
-      } else if (entry.type === 'text') {
-        const text = document.createElement('div');
-        text.className = 'content';
-        text.textContent = entry.text;
-        contentEl = text;
-      } else if (entry.type === 'link') {
-        const a = document.createElement('a');
-        a.href = entry.url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.textContent = entry.linkText || entry.title || entry.url;
-        contentEl = a;
-      } else if (entry.type === 'text_link') {
-        const wrap = document.createElement('div');
-        wrap.className = 'content';
-        const span = document.createElement('span');
-        span.textContent = (entry.text || '') + ' ';
-        const a = document.createElement('a');
-        a.href = entry.url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.textContent = entry.linkText || entry.url;
-        wrap.appendChild(span);
-        wrap.appendChild(a);
-        contentEl = wrap;
-      } else if (entry.type === 'youtube') {
-        const iframe = document.createElement('iframe');
-        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-        iframe.allowFullscreen = true;
-        iframe.loading = 'lazy';
-        iframe.src = `https://www.youtube-nocookie.com/embed/${entry.youtubeId}`;
-        iframe.addEventListener('load', scheduleRelayout);
-        contentEl = iframe;
-      }
-
-      if (state.viewMode === 'compact') {
-        card.classList.add('compact', 'collapsed');
-        const summary = document.createElement('div');
-        summary.className = 'summary';
-        const titleWrap = document.createElement('div');
-        titleWrap.className = 'title';
-        titleWrap.textContent = entry.title || entry.linkText || entry.url || entry.text || entry.id;
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        const type = document.createElement('span');
-        type.textContent = entry.type;
-        meta.appendChild(type);
-        if (entry.tags && entry.tags.length) {
-          for (const t of entry.tags) {
-            const tag = document.createElement('span');
-            tag.className = 'tag';
-            tag.textContent = t;
-            meta.appendChild(tag);
-          }
-        }
-        summary.appendChild(titleWrap);
-        summary.appendChild(meta);
-        card.appendChild(summary);
-
-        bodyEl = document.createElement('div');
-        bodyEl.className = 'body';
-        if (entry.title) bodyEl.appendChild(title);
-        if (contentEl) bodyEl.appendChild(contentEl);
-        card.appendChild(bodyEl);
-
-        card.addEventListener('click', (e) => {
-          if (state.isDragging || state.dragMoved || state.justDragged) return;
-          // ignore link clicks inside
-          if (e.target && (e.target.tagName === 'A' || e.target.closest('a'))) return;
-          card.classList.toggle('expanded');
-          if (card.classList.contains('expanded')) {
-            card.classList.remove('collapsed');
-            bodyEl.style.display = 'block';
-          } else {
-            card.classList.add('collapsed');
-            bodyEl.style.display = 'none';
-          }
-          scheduleRelayout();
-        });
-        // start collapsed
-        if (bodyEl) bodyEl.style.display = 'none';
-      } else {
-        if (entry.title) card.appendChild(title);
-        if (contentEl) card.appendChild(contentEl);
-      }
-
-      // NOTE: Previously, clicking a card centered the view. This is disabled to
-      // keep dragging responsive and avoid accidental recenters.
-
-      world.appendChild(card);
-      state.entryIdToEl.set(entry.__uid, card);
-    }
-  }
-
   function debounce(fn, wait) {
-    let t = null;
-    return function (...args) {
+    var t = null;
+    return function () {
+      var args = arguments, self = this;
       if (t) clearTimeout(t);
-      t = setTimeout(() => fn.apply(this, args), wait);
+      t = setTimeout(function () { fn.apply(self, args); }, wait);
     };
   }
 
-  function measureAndAssignPositions(entries, { shuffle = false } = {}) {
-    const vp = viewport.getBoundingClientRect();
-    const order = shuffle ? [...entries].sort(() => Math.random() - 0.5) : [...entries];
+  /* ==============================================================
+     transform + render loop
+     ============================================================== */
 
-    if (state.viewMode === 'list') {
-      const listWidth = Math.min(720, Math.floor(vp.width * 0.9));
-      let y = 0;
-      const gapY = 26;
-      for (const entry of order) {
-        const el = state.entryIdToEl.get(entry.__uid);
-        if (!el) continue;
-        el.style.width = `${listWidth}px`;
-        const rect = el.getBoundingClientRect();
-        const height = rect.height;
-        const x = Math.round(-listWidth / 2);
-        entry.x = x;
-        entry.y = Math.round(y);
-        y += height + gapY;
+  function applyTransform() {
+    world.style.transform =
+      'translate3d(' + state.pan.x + 'px,' + state.pan.y + 'px,0) scale(' + state.zoom + ')';
+    paintGrid();
+    paintHud();
+  }
+
+  /* The grid holds a constant on-screen density by jumping octaves,
+     so it stays readable from 22% to 260%. */
+  function paintGrid() {
+    var step = GRID_BASE * state.zoom;
+    while (step < 15) step *= 2;
+    while (step > 60) step /= 2;
+    gridEl.style.setProperty('--g1', step + 'px');
+    gridEl.style.setProperty('--g2', step * 6 + 'px');
+    gridEl.style.setProperty('--gx', state.pan.x + 'px');
+    gridEl.style.setProperty('--gy', state.pan.y + 'px');
+  }
+
+  function paintHud() {
+    var vp = viewportSize();
+    var wx = Math.round((vp.w / 2 - state.pan.x) / state.zoom);
+    var wy = Math.round((vp.h / 2 - state.pan.y) / state.zoom);
+    var sign = function (n) { return (n < 0 ? '−' : '+') + Math.abs(n); };
+    coordEl.textContent = sign(wx) + ' ' + sign(wy);
+    zoomValEl.textContent = Math.round(state.zoom * 100) + '%';
+  }
+
+  function viewportSize() {
+    return { w: viewport.clientWidth, h: viewport.clientHeight };
+  }
+
+  function ensureLoop() {
+    if (state.raf != null) return;
+    var SMOOTH = reduceMotion ? 1 : 0.19;
+    var FRICTION = 0.86;
+    var EPS = 0.05;
+
+    function step() {
+      if (!reduceMotion && (Math.abs(state.vel.x) > EPS || Math.abs(state.vel.y) > EPS)) {
+        state.panTarget.x += state.vel.x;
+        state.panTarget.y += state.vel.y;
+        state.vel.x *= FRICTION;
+        state.vel.y *= FRICTION;
+      } else {
+        state.vel.x = state.vel.y = 0;
       }
-    } else if (state.viewMode === 'compact') {
-      const tableWidth = Math.min(900, Math.floor(vp.width * 0.95));
-      let y = 0;
-      const rowGap = 14;
-      for (const entry of order) {
-        const el = state.entryIdToEl.get(entry.__uid);
-        if (!el) continue;
-        el.style.width = `${tableWidth}px`;
-        const rect = el.getBoundingClientRect();
-        const height = rect.height;
-        const x = Math.round(-tableWidth / 2);
-        entry.x = x;
-        entry.y = Math.round(y);
-        y += height + rowGap;
+
+      state.pan.x = lerp(state.pan.x, state.panTarget.x, SMOOTH);
+      state.pan.y = lerp(state.pan.y, state.panTarget.y, SMOOTH);
+      state.zoom = lerp(state.zoom, state.zoomTarget, SMOOTH);
+      applyTransform();
+
+      var settled =
+        Math.abs(state.pan.x - state.panTarget.x) < 0.3 &&
+        Math.abs(state.pan.y - state.panTarget.y) < 0.3 &&
+        Math.abs(state.zoom - state.zoomTarget) < 0.0015;
+      var moving = state.dragging || Math.abs(state.vel.x) > EPS || Math.abs(state.vel.y) > EPS;
+
+      if (settled && !moving) {
+        state.pan.x = state.panTarget.x;
+        state.pan.y = state.panTarget.y;
+        state.zoom = state.zoomTarget;
+        applyTransform();
+        state.raf = null;
+        return;
       }
-    } else {
-      const gapX = LAYOUT.gap;
-      const gapY = LAYOUT.gap + 20; // extra vertical breathing room
-      const effectiveCardWidth = Math.min(LAYOUT.columnWidth, Math.floor(vp.width * 0.86));
-      const columns = Math.max(
-        LAYOUT.minCols,
-        Math.min(LAYOUT.maxCols, Math.floor((vp.width - gapX) / (effectiveCardWidth + gapX)) || 1)
-      );
-
-      const totalWidth = columns * effectiveCardWidth + (columns - 1) * gapX;
-      const xStart = -totalWidth / 2;
-      const colHeights = new Array(columns).fill(0);
-
-      for (const entry of order) {
-        const el = state.entryIdToEl.get(entry.__uid);
-        if (!el) continue;
-        el.style.width = `${effectiveCardWidth}px`;
-        const rect = el.getBoundingClientRect();
-        const height = rect.height;
-
-        // pick shortest column
-        let colIndex = 0;
-        for (let i = 1; i < columns; i++) {
-          if (colHeights[i] < colHeights[colIndex]) colIndex = i;
-        }
-        const x = Math.round(xStart + colIndex * (effectiveCardWidth + gapX));
-        const y = Math.round(colHeights[colIndex]);
-
-        entry.x = x;
-        entry.y = y;
-        colHeights[colIndex] += height + gapY;
-      }
+      state.raf = requestAnimationFrame(step);
     }
+    state.raf = requestAnimationFrame(step);
   }
 
-  function computePanToCenterFromDOM(entries) {
-    if (!entries.length) return { x: 0, y: 0 };
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const e of entries) {
-      const el = state.entryIdToEl.get(e.__uid);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
-      minX = Math.min(minX, e.x);
-      minY = Math.min(minY, e.y);
-      maxX = Math.max(maxX, e.x + w);
-      maxY = Math.max(maxY, e.y + h);
+  function panTo(x, y) {
+    state.panTarget.x = x;
+    state.panTarget.y = y;
+    state.vel.x = state.vel.y = 0;
+    ensureLoop();
+  }
+
+  /* Zoom while holding the world point under (sx, sy) still. */
+  function zoomAt(next, sx, sy) {
+    var z0 = state.zoomTarget;
+    var z1 = clamp(next, MIN_ZOOM, MAX_ZOOM);
+    if (Math.abs(z1 - z0) < 0.0001) return;
+    state.touched = true;
+    var wx = (sx - state.panTarget.x) / z0;
+    var wy = (sy - state.panTarget.y) / z0;
+    state.zoomTarget = z1;
+    state.panTarget.x = sx - wx * z1;
+    state.panTarget.y = sy - wy * z1;
+    ensureLoop();
+  }
+
+  function zoomBy(factor) {
+    var vp = viewportSize();
+    zoomAt(state.zoomTarget * factor, vp.w / 2, vp.h / 2);
+  }
+
+  /* ==============================================================
+     pointer input — drag to pan, two fingers to pinch
+     ============================================================== */
+
+  function isInteractive(ev) {
+    var t = ev.target;
+    return !!(t && t.closest && t.closest('a, button, input, textarea, select, iframe, .card--compact'));
+  }
+
+  viewport.addEventListener('pointerdown', function (ev) {
+    state.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    if (state.pointers.size === 2) { beginPinch(); return; }
+    if (state.pointers.size > 2) return;
+    if (isInteractive(ev)) return;
+
+    ev.preventDefault();
+    try { viewport.setPointerCapture(ev.pointerId); } catch (e) {}
+    var sel = window.getSelection && window.getSelection();
+    if (sel && sel.removeAllRanges) { try { sel.removeAllRanges(); } catch (e2) {} }
+
+    state.dragging = true;
+    state.moved = false;
+    state.drag = {
+      sx: ev.clientX, sy: ev.clientY,
+      px: state.panTarget.x, py: state.panTarget.y,
+      lx: ev.clientX, ly: ev.clientY, lt: performance.now()
+    };
+    state.vel.x = state.vel.y = 0;
+    viewport.classList.add('is-dragging');
+    ensureLoop();
+  });
+
+  window.addEventListener('pointermove', function (ev) {
+    if (state.pointers.has(ev.pointerId)) {
+      state.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const vp = viewport.getBoundingClientRect();
-    return { x: vp.width / 2 - cx, y: vp.height / 2 - cy };
-  }
+    if (state.pinch) { updatePinch(); return; }
+    if (!state.dragging) return;
 
-  function layoutAndApply(entries, opts) {
-    measureAndAssignPositions(entries, opts);
-    applyPositions(entries);
-  }
-
-  const scheduleRelayout = debounce(() => {
-    if (!state.viewEntries.length) return;
-    layoutAndApply(state.viewEntries);
-  }, 60);
-
-  function approximateSizeForEntry(entry) {
-    // Rough dimensions used for layout spacing and centering
-    const width = entry.type === 'youtube' ? 420 : 360; // px content width
-    const height = entry.type === 'image' ? 260 : (entry.type === 'youtube' ? 236 : 180);
-    return { width, height };
-  }
-
-  function assignPositions(entries, { shuffle = false } = {}) {
-    const vp = viewport.getBoundingClientRect();
-    const baseColumnWidth = 460; // column width including typical padding
-    const gap = 60; // spacing between cards
-    const maxCols = 6;
-    const minCols = 2;
-    const columns = Math.max(minCols, Math.min(maxCols, Math.floor((vp.width - gap) / (baseColumnWidth + gap)) || 3));
-
-    const totalWidth = columns * baseColumnWidth + (columns - 1) * gap;
-    const xStart = -totalWidth / 2; // center around 0
-    const colHeights = new Array(columns).fill(0);
-
-    const items = shuffle ? [...entries].sort(() => Math.random() - 0.5) : [...entries];
-
-    for (const entry of items) {
-      const { width, height } = approximateSizeForEntry(entry);
-      // find column with smallest accumulated height
-      let colIndex = 0;
-      let minH = colHeights[0];
-      for (let i = 1; i < columns; i++) {
-        if (colHeights[i] < minH) { minH = colHeights[i]; colIndex = i; }
-      }
-      const colX = xStart + colIndex * (baseColumnWidth + gap);
-      const insetX = (baseColumnWidth - width) / 2; // center narrower cards in the column
-      const x = Math.round(colX + insetX);
-      const y = Math.round(colHeights[colIndex]);
-
-      entry.x = x;
-      entry.y = y;
-
-      colHeights[colIndex] += height + gap;
+    ev.preventDefault();
+    var d = state.drag;
+    var dx = ev.clientX - d.sx;
+    var dy = ev.clientY - d.sy;
+    if (!state.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      state.moved = true;
+      state.touched = true;
     }
-  }
 
-  function applyPositions(entries) {
-    for (const entry of entries) {
-      const el = state.entryIdToEl.get(entry.__uid);
-      if (!el) continue;
-      el.style.left = `${entry.x}px`;
-      el.style.top = `${entry.y}px`;
+    state.panTarget.x = d.px + dx;
+    state.panTarget.y = d.py + dy;
+
+    var now = performance.now();
+    var dt = Math.max(1, now - d.lt);
+    state.vel.x = ((ev.clientX - d.lx) / dt) * 16;
+    state.vel.y = ((ev.clientY - d.ly) / dt) * 16;
+    d.lx = ev.clientX; d.ly = ev.clientY; d.lt = now;
+    ensureLoop();
+  }, { passive: false });
+
+  function endPointer(ev) {
+    state.pointers.delete(ev.pointerId);
+    if (state.pointers.size < 2) state.pinch = null;
+    if (!state.dragging) return;
+
+    var moved = state.moved;
+    state.dragging = false;
+    viewport.classList.remove('is-dragging');
+    if (moved) {
+      /* swallow the click that a drag-release would otherwise fire */
+      state.suppressClick = true;
+      setTimeout(function () { state.suppressClick = false; }, 130);
     }
+    ensureLoop();
+  }
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
+
+  function pinchPoints() {
+    var pts = Array.from(state.pointers.values());
+    var a = pts[0], b = pts[1];
+    return {
+      dist: Math.hypot(b.x - a.x, b.y - a.y),
+      mx: (a.x + b.x) / 2,
+      my: (a.y + b.y) / 2
+    };
   }
 
-  function computeInitialPanToCenter(entries) {
-    if (!entries.length) return { x: 0, y: 0 };
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const e of entries) {
-      minX = Math.min(minX, e.x);
-      minY = Math.min(minY, e.y);
-      // approximate card size
-      const w = e.type === 'youtube' ? 420 : 360;
-      const h = e.type === 'image' ? 260 : (e.type === 'youtube' ? 236 : 180);
-      maxX = Math.max(maxX, e.x + w);
-      maxY = Math.max(maxY, e.y + h);
-    }
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const vp = viewport.getBoundingClientRect();
-    return { x: vp.width / 2 - cx, y: vp.height / 2 - cy };
+  function beginPinch() {
+    state.dragging = false;
+    viewport.classList.remove('is-dragging');
+    var p = pinchPoints();
+    state.pinch = { dist: p.dist || 1, zoom: state.zoomTarget };
   }
 
-  function normalize(str) { return (str || '').toLowerCase(); }
+  function updatePinch() {
+    var p = pinchPoints();
+    if (!p.dist) return;
+    zoomAt(state.pinch.zoom * (p.dist / state.pinch.dist), p.mx, p.my);
+  }
 
-  function updateSearchResults(query) {
-    const q = normalize(query);
-    const results = !q ? [] : state.entries.filter(e => {
-      const inTitle = normalize(e.title).includes(q);
-      const inTags = (e.tags || []).some(t => normalize(t).includes(q));
-      const inText = normalize(e.text).includes(q);
-      return inTitle || inTags || inText;
-    }).slice(0, 12);
+  /* Wheel pans; ctrl/cmd-wheel (and trackpad pinch, which browsers
+     report as ctrlKey) zooms. */
+  document.addEventListener('wheel', function (ev) {
+    var t = ev.target;
+    if (t && t.closest && t.closest('.console, .sheet, .dock, .hud, .lightbox')) return;
+    ev.preventDefault();
 
-    searchResults.innerHTML = '';
-    if (!results.length) {
-      searchResults.classList.remove('show');
+    if (ev.ctrlKey || ev.metaKey) {
+      zoomAt(state.zoomTarget * Math.exp(-ev.deltaY * 0.0022), ev.clientX, ev.clientY);
       return;
     }
-    for (const e of results) {
-      const li = document.createElement('li');
-      const title = document.createElement('div');
-      title.className = 'result-title';
-      title.textContent = e.title || e.linkText || e.url || e.text?.slice(0, 60) || e.id;
-      const type = document.createElement('div');
-      type.className = 'result-type';
-      type.textContent = e.type;
-      li.appendChild(title);
-      li.appendChild(type);
-      li.addEventListener('click', () => {
-        centerOnEntry(e.__uid);
-        searchResults.classList.remove('show');
-      });
-      searchResults.appendChild(li);
+    state.touched = true;
+    var cap = 40, scale = 0.45;
+    state.vel.x += -Math.sign(ev.deltaX) * Math.min(Math.abs(ev.deltaX), cap) * scale;
+    state.vel.y += -Math.sign(ev.deltaY) * Math.min(Math.abs(ev.deltaY), cap) * scale;
+    if (reduceMotion) {
+      state.panTarget.x += state.vel.x * 6;
+      state.panTarget.y += state.vel.y * 6;
+      state.vel.x = state.vel.y = 0;
     }
-    searchResults.classList.add('show');
+    ensureLoop();
+  }, { passive: false });
+
+  /* ==============================================================
+     rendering
+     ============================================================== */
+
+  /* Re-measure, then re-frame only while the view is still ours —
+     once the reader has panned or zoomed, leave them where they are. */
+  var scheduleLayout = debounce(function () {
+    layout();
+    if (!state.touched) frame(false);
+  }, 70);
+
+  function renderVisible() {
+    world.innerHTML = '';
+    state.nodes.clear();
+
+    var frag = document.createDocumentFragment();
+    state.visible.forEach(function (entry, i) {
+      var node = document.createElement('div');
+      node.className = 'node';
+      node.dataset.uid = entry.__uid;
+
+      var card = Card.createCard(entry, {
+        index: entry.__index + 1,
+        compact: state.view === 'compact',
+        interactive: true,
+        onLoad: scheduleLayout,
+        isDragging: function () { return state.dragging || state.moved || state.suppressClick; },
+        onToggle: scheduleLayout,
+        onImageClick: function (e) { openLightbox(e); }
+      });
+
+      if (entry.__uid === state.activeUid) card.classList.add('is-active');
+      if (!reduceMotion) {
+        /* on the card, not the node — the node's transform is its position */
+        card.style.animation = 'card-in 520ms var(--ease) both';
+        card.style.animationDelay = Math.min(i * 16, 380) + 'ms';
+      }
+
+      node.appendChild(card);
+      frag.appendChild(node);
+      state.nodes.set(entry.__uid, node);
+    });
+    world.appendChild(frag);
   }
 
-  async function init() {
-    // events
-    viewport.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerUp);
-    // block native dragstart on any descendants (images/links)
-    window.addEventListener('dragstart', (e) => { e.preventDefault(); }, { capture: true });
-
-    searchInput.addEventListener('input', (e) => updateSearchResults(e.target.value));
-    searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const first = searchResults.querySelector('li');
-        if (first) {
-          const idx = Array.from(searchResults.children).indexOf(first);
-          const match = state.entries.filter(en => {
-            const q = searchInput.value.toLowerCase();
-            const inTitle = (en.title || '').toLowerCase().includes(q);
-            const inTags = (en.tags || []).some(t => (t || '').toLowerCase().includes(q));
-            const inText = (en.text || '').toLowerCase().includes(q);
-            return inTitle || inTags || inText;
-          })[idx];
-          if (match) centerOnEntry(match.__uid);
-          searchResults.classList.remove('show');
-        }
-      } else if (e.key === 'Escape') {
-        searchResults.classList.remove('show');
-        searchInput.blur();
-      }
-    });
-
-    // data
-    const res = await fetch('entries.json', { cache: 'no-store' });
-    const json = await res.json();
-    const entries = Array.isArray(json) ? json : (json.root || []);
-    entries.forEach((e, i) => { e.__uid = `${e.id || 'item'}__${i}`; });
-    state.entries = entries;
-    state.viewEntries = entries;
-    renderEntries(state.viewEntries);
-    // First layout pass after DOM nodes exist (uses measured heights)
-    layoutAndApply(state.viewEntries, { shuffle: false });
-    const start = computePanToCenterFromDOM(state.viewEntries);
-    state.panX = start.x; state.panY = start.y; setWorldTransform(state.panX, state.panY);
-    state.targetPanX = state.panX; state.targetPanY = state.panY;
-
-    // lightbox interactions
-    lightbox.addEventListener('click', () => {
-      lightbox.setAttribute('hidden', '');
-      lightboxImg.src = '';
-    });
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !lightbox.hasAttribute('hidden')) {
-        lightbox.setAttribute('hidden', '');
-        lightboxImg.src = '';
-      }
-    });
-
-    const modes = ['grid', 'list', 'compact'];
-    const viewSlider = document.getElementById('viewSlider');
-    const trackEl = viewSlider ? viewSlider.querySelector('.track') : null;
-    const thumbEl = viewSlider ? viewSlider.querySelector('.thumb') : null;
-    const fillEl = viewSlider ? viewSlider.querySelector('.fill') : null;
-    const labelEls = viewSlider ? Array.from(viewSlider.querySelectorAll('.labels span')) : [];
-
-    function updateSliderVisual(mode) {
-      if (!viewSlider || !trackEl || !thumbEl || !fillEl) return;
-      const idx = Math.max(0, modes.indexOf(mode));
-      const steps = modes.length - 1 || 1;
-      const pct = (idx / steps) * 100;
-      thumbEl.style.left = `${pct}%`;
-      fillEl.style.width = `${pct}%`;
-      labelEls.forEach((el, i) => el.classList.toggle('active', i === idx));
-    }
-
-    function applyFiltersAndRender({ shuffle = false, recenter = true } = {}) {
-      const sortSelect = document.getElementById('sortSelect');
-      let list = state.entries;
-      const effectiveTags = state.selectedTags || [];
-      if (effectiveTags.length) {
-        list = list.filter(e => {
-          const tags = e.tags || [];
-          return tags.some(t => effectiveTags.includes(t));
-        });
-      }
-      const sortVal = sortSelect ? sortSelect.value : 'original';
-      list = [...list];
-      if (sortVal === 'title') {
-        list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-      } else if (sortVal === 'type') {
-        list.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
-      }
-      state.viewEntries = list;
-      renderEntries(state.viewEntries);
-      layoutAndApply(state.viewEntries, { shuffle });
-      updateSliderVisual(state.viewMode);
-      if (recenter) {
-        const center = computePanToCenterFromDOM(state.viewEntries);
-        animatePanTo(center.x, center.y);
-      }
-    }
-
-    if (shuffleBtn) {
-      shuffleBtn.addEventListener('click', () => {
-        layoutAndApply(state.viewEntries, { shuffle: true });
-      });
-    }
-
-    function setViewMode(mode, { recenter = true } = {}) {
-      if (!modes.includes(mode)) return;
-      state.viewMode = mode;
-      applyFiltersAndRender({ shuffle: false, recenter });
-    }
-
-    if (viewSlider && trackEl && thumbEl) {
-      let dragging = false;
-      function modeFromClientX(clientX) {
-        const rect = trackEl.getBoundingClientRect();
-        const clampedX = Math.min(Math.max(clientX, rect.left), rect.right);
-        const steps = modes.length - 1 || 1;
-        const ratio = (clampedX - rect.left) / (rect.width || 1);
-        const idx = Math.round(ratio * steps);
-        return modes[idx];
-      }
-      function pointerMove(ev) {
-        if (!dragging) return;
-        ev.preventDefault();
-        const mode = modeFromClientX(ev.clientX);
-        setViewMode(mode, { recenter: true });
-      }
-      trackEl.addEventListener('pointerdown', (ev) => {
-        dragging = true;
-        const mode = modeFromClientX(ev.clientX);
-        setViewMode(mode, { recenter: true });
-        window.addEventListener('pointermove', pointerMove);
-        window.addEventListener('pointerup', () => {
-          dragging = false;
-          window.removeEventListener('pointermove', pointerMove);
-        }, { once: true });
-      });
-      thumbEl.addEventListener('pointerdown', (ev) => {
-        dragging = true;
-        ev.preventDefault();
-        window.addEventListener('pointermove', pointerMove);
-        window.addEventListener('pointerup', () => {
-          dragging = false;
-          window.removeEventListener('pointermove', pointerMove);
-        }, { once: true });
-      });
-      labelEls.forEach((el) => {
-        el.addEventListener('click', () => {
-          const mode = el.dataset.mode;
-          setViewMode(mode, { recenter: true });
-        });
-      });
-      updateSliderVisual(state.viewMode);
-    }
-
-    const sortSelectEl = document.getElementById('sortSelect');
-    const tagPillsEl = document.getElementById('tagPills');
-    function rebuildTagPills() {
-      if (!tagPillsEl) return;
-      tagPillsEl.innerHTML = '';
-      const tagSet = new Set();
-      for (const e of state.entries) {
-        (e.tags || []).forEach(t => tagSet.add(t));
-      }
-      const tagsSorted = Array.from(tagSet).sort((a, b) => a.localeCompare(b));
-      const allPill = document.createElement('button');
-      allPill.type = 'button';
-      allPill.className = 'tag-pill';
-      if (!state.selectedTags.length) allPill.classList.add('active');
-      allPill.textContent = 'all tags';
-      allPill.addEventListener('click', () => {
-        state.selectedTags = [];
-        rebuildTagPills();
-        applyFiltersAndRender({ shuffle: false, recenter: true });
-      });
-      tagPillsEl.appendChild(allPill);
-      for (const t of tagsSorted) {
-        const pill = document.createElement('button');
-        pill.type = 'button';
-        pill.className = 'tag-pill';
-        if (state.selectedTags.includes(t)) pill.classList.add('active');
-        pill.textContent = t;
-        pill.addEventListener('click', () => {
-          if (state.selectedTags.includes(t)) {
-            state.selectedTags = state.selectedTags.filter(x => x !== t);
-          } else {
-            state.selectedTags = [...state.selectedTags, t];
-          }
-          rebuildTagPills();
-          applyFiltersAndRender({ shuffle: false, recenter: true });
-        });
-        tagPillsEl.appendChild(pill);
-      }
-      // enable wheel and drag scrolling (prevent bubbling to viewport)
-      tagPillsEl.addEventListener('wheel', (e) => {
-        if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
-          tagPillsEl.scrollLeft += e.deltaY;
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }, { passive: false });
-      let dragging = false;
-      let dragStartX = 0;
-      let scrollStart = 0;
-      tagPillsEl.addEventListener('pointerdown', (e) => {
-        dragging = true;
-        dragStartX = e.clientX;
-        scrollStart = tagPillsEl.scrollLeft;
-      });
-      window.addEventListener('pointerup', () => { dragging = false; });
-      window.addEventListener('pointermove', (e) => {
-        if (!dragging) return;
-        const dx = e.clientX - dragStartX;
-        tagPillsEl.scrollLeft = scrollStart - dx;
-      });
-    }
-
-    rebuildTagPills();
-    if (sortSelectEl) {
-      sortSelectEl.addEventListener('change', () => applyFiltersAndRender({ shuffle: false, recenter: true }));
-    }
-
-    // initial apply to ensure any filters/sort/view take effect
-    applyFiltersAndRender({ shuffle: false, recenter: false });
-
-    // relayout on resize
-    window.addEventListener('resize', scheduleRelayout);
+  /* The strip of screen the canvas actually gets. An open drawer owns
+     the left edge on desktop, so both layout and framing work against
+     what is left — otherwise the wall is laid out under the panel and
+     then zoomed out to compensate. */
+  function contentArea() {
+    var vp = viewportSize();
+    var narrow = vp.w < 560;
+    var insetL = (vp.w > 720 && consoleIsOpen()) ? consoleEl.offsetWidth + 28 : 0;
+    var padX = narrow ? 20 : 48;
+    return {
+      vw: vp.w,
+      vh: vp.h,
+      narrow: narrow,
+      left: insetL,
+      width: Math.max(260, vp.w - insetL - padX * 2)
+    };
   }
 
-  window.addEventListener('load', init);
+  /* Two passes: set the width, measure the real height, then place. */
+  function layout(opts) {
+    opts = opts || {};
+    if (!state.visible.length) return;
 
-  function onWheel(ev) {
-    // allow pinch-zoom gestures/etc to pass if ctrlKey (browser zoom)
-    if (ev.ctrlKey) return;
-    ev.preventDefault();
-    // accumulate velocity; invert so wheel direction feels natural
-    const scale = 0.45; // reduced sensitivity for smoother feel
-    const clamp = 40;   // cap large deltas from fast wheels/trackpads
-    const dx = -Math.sign(ev.deltaX) * Math.min(Math.abs(ev.deltaX), clamp) * scale;
-    const dy = -Math.sign(ev.deltaY) * Math.min(Math.abs(ev.deltaY), clamp) * scale;
-    state.vx += dx;
-    state.vy += dy;
-    ensureRenderLoop();
+    /* A hidden or not-yet-sized pane measures zero, which would bake
+       nonsense positions in permanently. Wait for a real width. */
+    if (!viewport.clientWidth) { scheduleLayout(); return; }
+
+    var area = contentArea();
+    var order = opts.shuffle ? shuffled(state.visible) : state.visible;
+
+    if (state.view === 'list' || state.view === 'compact') {
+      var colW = Math.min(state.view === 'list' ? 660 : 880, area.width);
+      var gap = state.view === 'list' ? 28 : 12;
+      var y = 0;
+      order.forEach(function (entry) {
+        var node = state.nodes.get(entry.__uid);
+        if (!node) return;
+        node.style.width = colW + 'px';
+        entry.__x = Math.round(-colW / 2);
+        entry.__y = Math.round(y);
+        y += node.offsetHeight + gap;
+      });
+    } else {
+      /* Pick the column count from how wide a card wants to be, then
+         let the cards stretch to fill the row — so a wide screen gets
+         more columns rather than more emptiness. */
+      var gapX = area.narrow ? 28 : 56;
+      var gapY = area.narrow ? 36 : 72;
+      var TARGET = 340;
+      var cols = clamp(
+        Math.floor((area.width + gapX) / (TARGET + gapX)),
+        area.narrow ? 1 : 2,
+        6
+      );
+      var cardW = clamp(Math.floor((area.width - (cols - 1) * gapX) / cols), 280, 460);
+      var totalW = cols * cardW + (cols - 1) * gapX;
+      var x0 = -totalW / 2;
+      var heights = new Array(cols).fill(0);
+
+      order.forEach(function (entry) {
+        var node = state.nodes.get(entry.__uid);
+        if (!node) return;
+        node.style.width = cardW + 'px';
+        var h = node.offsetHeight;
+
+        var col = 0;
+        for (var i = 1; i < cols; i++) if (heights[i] < heights[col]) col = i;
+
+        entry.__x = Math.round(x0 + col * (cardW + gapX));
+        entry.__y = Math.round(heights[col]);
+        heights[col] += h + gapY;
+      });
+    }
+
+    place();
   }
-  // attach non-passive so we can preventDefault
-  document.addEventListener('wheel', onWheel, { passive: false });
 
-  // Keyboard navigation between entries and Ctrl/Cmd+K for search
-  function getEntryCenters() {
-    const list = [];
-    for (const e of state.viewEntries) {
-      const el = state.entryIdToEl.get(e.__uid);
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
-      list.push({ uid: e.__uid, x: e.x + w / 2, y: e.y + h / 2, w, h });
+  function place() {
+    state.visible.forEach(function (entry) {
+      var node = state.nodes.get(entry.__uid);
+      if (!node) return;
+      node.style.transform = 'translate3d(' + entry.__x + 'px,' + entry.__y + 'px,0)';
+    });
+  }
+
+  function shuffled(list) {
+    var out = list.slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+    }
+    return out;
+  }
+
+  /* World-space bounding box of everything currently placed. */
+  function bounds() {
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    state.visible.forEach(function (entry) {
+      var node = state.nodes.get(entry.__uid);
+      if (!node || entry.__x == null) return;
+      minX = Math.min(minX, entry.__x);
+      minY = Math.min(minY, entry.__y);
+      maxX = Math.max(maxX, entry.__x + node.offsetWidth);
+      maxY = Math.max(maxY, entry.__y + node.offsetHeight);
+    });
+    if (minX === Infinity) return null;
+    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+  }
+
+  /* Frame the archive: fit its width, and top-align when the stack is
+     taller than the screen. Fitting the *height* of a masonry wall
+     means zooming to 12%, which shows nothing worth seeing. */
+  function frame(animate) {
+    var b = bounds();
+    var vp = viewportSize();
+    if (!b || !vp.w || !vp.h) return;
+
+    var padY = 72;
+    var area = contentArea();
+
+    var bw = Math.max(1, b.maxX - b.minX);
+    var bh = Math.max(1, b.maxY - b.minY);
+
+    var z = clamp(Math.min(area.width / bw, 1), MIN_ZOOM, 1);
+    var cx = (b.minX + b.maxX) / 2;
+    var x = area.left + (vp.w - area.left) / 2 - cx * z;
+    var y = bh * z <= vp.h - padY * 2
+      ? vp.h / 2 - ((b.minY + b.maxY) / 2) * z   /* it all fits — centre it */
+      : padY - b.minY * z;                        /* taller than the screen — start at the top */
+
+    state.zoomTarget = z;
+    state.panTarget.x = x;
+    state.panTarget.y = y;
+    state.vel.x = state.vel.y = 0;
+    state.touched = false;
+
+    if (animate === false) {
+      state.pan.x = x;
+      state.pan.y = y;
+      state.zoom = z;
+      applyTransform();
+    } else {
+      ensureLoop();
+    }
+  }
+
+  /* Centre the viewport on one entry, keeping the current zoom. */
+  function centerOn(uid, opts) {
+    opts = opts || {};
+    var entry = state.visible.find(function (e) { return e.__uid === uid; });
+    var node = state.nodes.get(uid);
+    if (!entry || !node || entry.__x == null) return;
+
+    var z = opts.zoom != null ? clamp(opts.zoom, MIN_ZOOM, MAX_ZOOM) : state.zoomTarget;
+    var vp = viewportSize();
+    var cx = entry.__x + node.offsetWidth / 2;
+    var cy = entry.__y + node.offsetHeight / 2;
+
+    state.zoomTarget = z;
+    state.touched = true;
+    panTo(vp.w / 2 - cx * z, vp.h / 2 - cy * z);
+    setActive(uid);
+  }
+
+  function setActive(uid) {
+    if (state.activeUid === uid) return;
+    var prev = state.nodes.get(state.activeUid);
+    if (prev) prev.firstChild.classList.remove('is-active');
+    state.activeUid = uid;
+    var next = state.nodes.get(uid);
+    if (next) next.firstChild.classList.add('is-active');
+  }
+
+  /* ==============================================================
+     filtering, sorting, the list the canvas shows
+     ============================================================== */
+
+  function computeVisible() {
+    var list = state.entries;
+    if (state.tags.length) {
+      list = list.filter(function (e) {
+        return (e.tags || []).some(function (t) { return state.tags.indexOf(t) !== -1; });
+      });
+    }
+    list = list.slice();
+    if (state.sort === 'title') {
+      list.sort(function (a, b) {
+        return Card.entryTitle(a).localeCompare(Card.entryTitle(b));
+      });
+    } else if (state.sort === 'type') {
+      list.sort(function (a, b) {
+        var d = (a.type || '').localeCompare(b.type || '');
+        return d !== 0 ? d : Card.entryTitle(a).localeCompare(Card.entryTitle(b));
+      });
     }
     return list;
   }
 
-  function getWorldViewportCenter() {
-    const vp = viewport.getBoundingClientRect();
-    return { x: vp.width / 2 - state.panX, y: vp.height / 2 - state.panY };
+  function refresh(opts) {
+    opts = opts || {};
+    state.visible = computeVisible();
+    renderVisible();
+    layout({ shuffle: opts.shuffle });
+
+    countEl.textContent = state.visible.length === state.entries.length
+      ? state.entries.length + ' items'
+      : state.visible.length + ' / ' + state.entries.length;
+
+    paintTagIndex();
+    syncUrl();
+    showStatus(state.visible.length ? null : 'empty');
+    if (state.query) dimUnmatched(state.query.toLowerCase());
+
+    if (opts.recenter !== false) frame(opts.animate !== false);
+    else place();
   }
 
-  function pickInitialActive() {
-    const centers = getEntryCenters();
-    if (!centers.length) return null;
-    const c = getWorldViewportCenter();
-    let best = centers[0], bestD2 = Infinity;
-    for (const it of centers) {
-      const dx = it.x - c.x;
-      const dy = it.y - c.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) { bestD2 = d2; best = it; }
-    }
-    return best?.uid || null;
+  /* ==============================================================
+     tag index
+     ============================================================== */
+
+  function tagCounts() {
+    var counts = new Map();
+    state.entries.forEach(function (e) {
+      (e.tags || []).forEach(function (t) {
+        counts.set(t, (counts.get(t) || 0) + 1);
+      });
+    });
+    return counts;
   }
 
-  function moveFocus(direction) {
-    if (!state.entries.length) return;
-    if (!state.activeUid) {
-      state.activeUid = pickInitialActive();
-      if (state.activeUid) centerOnEntry(state.activeUid);
+  function paintTagIndex() {
+    var counts = tagCounts();
+    var names = Array.from(counts.keys()).sort(function (a, b) { return a.localeCompare(b); });
+    var q = state.query.toLowerCase();
+
+    tagIndexEl.innerHTML = '';
+    names.forEach(function (name) {
+      var on = state.tags.indexOf(name) !== -1;
+
+      /* When a search is running, grey out tags it cannot reach. */
+      var reachable = !q || state.entries.some(function (e) {
+        return (e.tags || []).indexOf(name) !== -1 && Card.searchText(e).indexOf(q) !== -1;
+      });
+
+      var li = document.createElement('li');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tag-row' + (on ? ' is-on' : '') + (reachable ? '' : ' is-empty');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+
+      var mark = document.createElement('span');
+      mark.className = 'tag-row__mark';
+      var nameEl = document.createElement('span');
+      nameEl.className = 'tag-row__name';
+      nameEl.textContent = name;
+      var leader = document.createElement('span');
+      leader.className = 'u-leader';
+      var count = document.createElement('span');
+      count.className = 'tag-row__count';
+      count.textContent = String(counts.get(name)).padStart(2, '0');
+
+      btn.append(mark, nameEl, leader, count);
+      btn.addEventListener('click', function () { toggleTag(name); });
+      li.appendChild(btn);
+      tagIndexEl.appendChild(li);
+    });
+
+    tagClearEl.hidden = state.tags.length === 0;
+  }
+
+  function toggleTag(name) {
+    var i = state.tags.indexOf(name);
+    if (i === -1) state.tags = state.tags.concat(name);
+    else state.tags = state.tags.filter(function (t) { return t !== name; });
+    refresh();
+  }
+
+  /* ==============================================================
+     search
+     ============================================================== */
+
+  function runSearch(raw) {
+    state.query = (raw || '').trim();
+    var q = state.query.toLowerCase();
+    document.querySelector('.search').classList.toggle('is-busy', !!q);
+
+    if (!q) {
+      state.results = [];
+      state.cursor = -1;
+      resultsEl.classList.remove('is-open');
+      resultsEl.innerHTML = '';
+      paintTagIndex();
+      undimAll();
       return;
     }
-    const centers = getEntryCenters();
-    const current = centers.find(c => c.uid === state.activeUid);
-    if (!current) {
-      state.activeUid = pickInitialActive();
-      if (state.activeUid) centerOnEntry(state.activeUid);
+
+    /* Search the whole archive, not just what the tag filter shows,
+       so a hidden entry is still findable. */
+    state.results = state.entries.filter(function (e) {
+      return Card.searchText(e).indexOf(q) !== -1;
+    }).slice(0, 24);
+    state.cursor = state.results.length ? 0 : -1;
+
+    paintResults(q);
+    paintTagIndex();
+    dimUnmatched(q);
+  }
+
+  function paintResults(q) {
+    resultsEl.innerHTML = '';
+    resultsEl.classList.add('is-open');
+
+    if (!state.results.length) {
+      var none = document.createElement('li');
+      none.className = 'results__empty';
+      none.textContent = 'nothing in the closet matches that';
+      resultsEl.appendChild(none);
       return;
     }
-    const dir = {
-      left:  { x: -1, y:  0 },
-      right: { x:  1, y:  0 },
-      up:    { x:  0, y: -1 },
-      down:  { x:  0, y:  1 },
-    }[direction];
-    if (!dir) return;
-    let best = null;
-    let bestScore = Infinity;
-    for (const it of centers) {
-      if (it.uid === current.uid) continue;
-      const dx = it.x - current.x;
-      const dy = it.y - current.y;
-      const dot = dx * dir.x + dy * dir.y;
-      if (dot <= 0) continue; // only consider items in the intended direction
-      // favor alignment in the chosen axis
-      const axisPenalty = (dir.x !== 0 ? Math.abs(dy) : Math.abs(dx));
-      const dist = Math.hypot(dx, dy);
-      const score = dist + axisPenalty * 0.5;
-      if (score < bestScore) { bestScore = score; best = it; }
-    }
-    if (!best) {
-      // wrap: pick nearest overall in that direction from viewport center
-      const c = getWorldViewportCenter();
-      let wrapBest = null, wrapScore = Infinity;
-      for (const it of centers) {
-        const dx = it.x - c.x;
-        const dy = it.y - c.y;
-        const dot = dx * dir.x + dy * dir.y;
-        if (dot <= 0) continue;
-        const axisPenalty = (dir.x !== 0 ? Math.abs(dy) : Math.abs(dx));
-        const dist = Math.hypot(dx, dy);
-        const score = dist + axisPenalty * 0.5;
-        if (score < wrapScore) { wrapScore = score; wrapBest = it; }
-      }
-      best = wrapBest;
-    }
-    if (best) {
-      state.activeUid = best.uid;
-      centerOnEntry(best.uid);
+
+    state.results.forEach(function (entry, i) {
+      var li = document.createElement('li');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'result' + (i === state.cursor ? ' is-cursor' : '');
+
+      var sigil = document.createElement('span');
+      sigil.className = 'result__sigil';
+      sigil.textContent = Card.typeInfo(entry.type).sigil;
+
+      var title = document.createElement('span');
+      title.className = 'result__title';
+      highlight(title, Card.entryTitle(entry), q);
+
+      btn.append(sigil, title);
+      btn.addEventListener('click', function () { gotoResult(i); });
+      btn.addEventListener('mouseenter', function () { moveCursor(i, false); });
+      li.appendChild(btn);
+      resultsEl.appendChild(li);
+    });
+  }
+
+  function highlight(host, text, q) {
+    var at = text.toLowerCase().indexOf(q);
+    if (at === -1) { host.textContent = text; return; }
+    host.appendChild(document.createTextNode(text.slice(0, at)));
+    var mark = document.createElement('mark');
+    mark.textContent = text.slice(at, at + q.length);
+    host.appendChild(mark);
+    host.appendChild(document.createTextNode(text.slice(at + q.length)));
+  }
+
+  function moveCursor(i, scroll) {
+    if (!state.results.length) return;
+    state.cursor = (i + state.results.length) % state.results.length;
+    var rows = resultsEl.querySelectorAll('.result');
+    rows.forEach(function (r, n) { r.classList.toggle('is-cursor', n === state.cursor); });
+    if (scroll !== false && rows[state.cursor]) {
+      rows[state.cursor].scrollIntoView({ block: 'nearest' });
     }
   }
 
-  window.addEventListener('keydown', (e) => {
-    // Ignore when typing in inputs or when lightbox is open
-    const tag = (document.activeElement && document.activeElement.tagName) || '';
-    const isEditing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (document.activeElement && document.activeElement.isContentEditable);
-    const lightboxOpen = !lightbox.hasAttribute('hidden');
-    if (lightboxOpen) return;
+  function gotoResult(i) {
+    var entry = state.results[i];
+    if (!entry) return;
 
-    // Ctrl/Cmd+K to focus search
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
-      e.preventDefault();
-      searchInput.focus();
-      searchInput.select();
-      searchResults.classList.add('show');
-      return;
+    /* If the tag filter is hiding it, drop the filter rather than
+       silently doing nothing. */
+    var onCanvas = state.visible.some(function (e) { return e.__uid === entry.__uid; });
+    if (!onCanvas) {
+      state.tags = [];
+      refresh({ recenter: false });
     }
-    if (isEditing) return;
+    resultsEl.classList.remove('is-open');
+    centerOn(entry.__uid, { zoom: Math.max(state.zoomTarget, 0.8) });
+  }
 
-    if (e.key === 'ArrowLeft') { e.preventDefault(); moveFocus('left'); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); moveFocus('right'); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); moveFocus('up'); }
-    else if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus('down'); }
+  function dimUnmatched(q) {
+    state.visible.forEach(function (e) {
+      var node = state.nodes.get(e.__uid);
+      if (!node) return;
+      node.firstChild.classList.toggle('is-dimmed', Card.searchText(e).indexOf(q) === -1);
+    });
+  }
+
+  function undimAll() {
+    state.nodes.forEach(function (node) { node.firstChild.classList.remove('is-dimmed'); });
+  }
+
+  /* ==============================================================
+     lightbox
+     ============================================================== */
+
+  function openLightbox(entry) {
+    if (state.suppressClick || state.moved) return;
+    lightboxImg.src = Card.resolveSrc(entry.src);
+    lightboxImg.alt = entry.alt || entry.title || '';
+    lightboxCap.textContent = [entry.title, entry.alt].filter(Boolean).join(' · ');
+    lightbox.hidden = false;
+    $('lightboxClose').focus();
+  }
+
+  function closeLightbox() {
+    lightbox.hidden = true;
+    lightboxImg.src = '';
+  }
+
+  lightbox.addEventListener('click', function (ev) {
+    if (ev.target === lightboxImg) return;
+    closeLightbox();
   });
+
+  /* ==============================================================
+     status overlay
+     ============================================================== */
+
+  function showStatus(kind, detail) {
+    if (!kind) { statusEl.hidden = true; return; }
+    statusEl.hidden = false;
+    statusBtn.hidden = true;
+
+    if (kind === 'loading') {
+      statusLine.textContent = 'opening the closet';
+      statusNote.textContent = '';
+    } else if (kind === 'empty') {
+      statusLine.textContent = 'nothing here';
+      statusNote.textContent = 'No entry carries ' +
+        (state.tags.length > 1 ? 'any of those tags.' : 'that tag.');
+      statusBtn.hidden = false;
+      statusBtn.textContent = 'clear filters';
+    } else if (kind === 'error') {
+      statusLine.textContent = 'could not read entries.json';
+      statusNote.textContent = detail || 'Check the file and reload.';
+      statusBtn.hidden = false;
+      statusBtn.textContent = 'retry';
+    }
+    statusEl.dataset.kind = kind;
+  }
+
+  statusBtn.addEventListener('click', function () {
+    if (statusEl.dataset.kind === 'error') { location.reload(); return; }
+    state.tags = [];
+    refresh();
+  });
+
+  /* ==============================================================
+     url state — shareable filters and a link to one entry
+     ============================================================== */
+
+  function syncUrl() {
+    var p = new URLSearchParams();
+    if (state.tags.length) p.set('tag', state.tags.join(','));
+    if (state.view !== 'grid') p.set('view', state.view);
+    if (state.sort !== 'original') p.set('sort', state.sort);
+    var qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+  }
+
+  function readUrl() {
+    var p = new URLSearchParams(location.search);
+    var tag = p.get('tag');
+    if (tag) state.tags = tag.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    var view = p.get('view');
+    if (VIEWS.indexOf(view) !== -1) state.view = view;
+    var sort = p.get('sort');
+    if (SORTS.indexOf(sort) !== -1) state.sort = sort;
+  }
+
+  /* ==============================================================
+     chrome wiring
+     ============================================================== */
+
+  function paintSegs() {
+    document.querySelectorAll('#viewSeg button').forEach(function (b) {
+      var on = b.dataset.view === state.view;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('#sortSeg button').forEach(function (b) {
+      var on = b.dataset.sort === state.sort;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function setConsoleOpen(open) {
+    consoleEl.dataset.open = open ? 'true' : 'false';
+    $('consoleToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+    $('consoleToggle').title = open ? 'collapse the index' : 'open the index';
+  }
+
+  function consoleIsOpen() { return consoleEl.dataset.open === 'true'; }
+
+  function wireChrome() {
+    $('consoleToggle').addEventListener('click', function () {
+      setConsoleOpen(!consoleIsOpen());
+      /* the drawer changes how much canvas there is, so re-flow */
+      layout();
+      frame(true);
+    });
+
+    document.querySelectorAll('#viewSeg button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.view = b.dataset.view;
+        paintSegs();
+        refresh();
+      });
+    });
+
+    document.querySelectorAll('#sortSeg button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.sort = b.dataset.sort;
+        paintSegs();
+        refresh();
+      });
+    });
+
+    $('shuffleBtn').addEventListener('click', function () {
+      layout({ shuffle: true });
+      frame(true);
+    });
+    $('fitBtn').addEventListener('click', function () { frame(true); });
+    tagClearEl.addEventListener('click', function () { state.tags = []; refresh(); });
+
+    document.querySelectorAll('[data-zoom]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        zoomBy(b.dataset.zoom === 'in' ? 1.25 : 1 / 1.25);
+      });
+    });
+    zoomValEl.addEventListener('click', function () {
+      var vp = viewportSize();
+      zoomAt(1, vp.w / 2, vp.h / 2);
+    });
+
+    qInput.addEventListener('input', function (e) { runSearch(e.target.value); });
+    qInput.addEventListener('focus', function () {
+      if (state.results.length) resultsEl.classList.add('is-open');
+    });
+    qInput.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveCursor(state.cursor + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moveCursor(state.cursor - 1); }
+      else if (e.key === 'Enter') { e.preventDefault(); gotoResult(state.cursor); }
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (qInput.value) { qInput.value = ''; runSearch(''); }
+        else qInput.blur();
+      }
+    });
+
+    helpBtn.addEventListener('click', function () { toggleSheet(); });
+    $('sheetClose').addEventListener('click', function () { toggleSheet(false); });
+    $('lightboxClose').addEventListener('click', closeLightbox);
+
+    /* Observe the viewport, not the window: the pane can change size
+       without a window resize event, and starts at zero width. */
+    var lastW = 0, lastH = 0;
+    var onResize = debounce(function () {
+      var vp = viewportSize();
+      if (!vp.w || (vp.w === lastW && vp.h === lastH)) return;
+      lastW = vp.w; lastH = vp.h;
+      layout();
+      if (!state.touched) frame(false);
+    }, 120);
+
+    if (window.ResizeObserver) new ResizeObserver(onResize).observe(viewport);
+    window.addEventListener('resize', onResize);
+  }
+
+  function toggleSheet(force) {
+    var open = force != null ? force : sheetEl.hidden;
+    sheetEl.hidden = !open;
+    helpBtn.classList.toggle('is-on', open);
+  }
+
+  /* ==============================================================
+     keyboard
+     ============================================================== */
+
+  function editing() {
+    var el = document.activeElement;
+    if (!el) return false;
+    var tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
+
+  /* Nearest entry to the middle of the screen, used as the starting
+     point for arrow navigation. */
+  function nearestToCenter() {
+    var vp = viewportSize();
+    var cx = (vp.w / 2 - state.pan.x) / state.zoom;
+    var cy = (vp.h / 2 - state.pan.y) / state.zoom;
+    var best = null, bestD = Infinity;
+    state.visible.forEach(function (e) {
+      var node = state.nodes.get(e.__uid);
+      if (!node || e.__x == null) return;
+      var dx = e.__x + node.offsetWidth / 2 - cx;
+      var dy = e.__y + node.offsetHeight / 2 - cy;
+      var d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = e.__uid; }
+    });
+    return best;
+  }
+
+  function stepFocus(dir) {
+    if (!state.visible.length) return;
+    if (!state.activeUid || !state.nodes.has(state.activeUid)) {
+      var first = nearestToCenter();
+      if (first) centerOn(first);
+      return;
+    }
+    var cur = state.visible.find(function (e) { return e.__uid === state.activeUid; });
+    var curNode = state.nodes.get(state.activeUid);
+    if (!cur || !curNode) return;
+
+    var vec = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }[dir];
+    var cx = cur.__x + curNode.offsetWidth / 2;
+    var cy = cur.__y + curNode.offsetHeight / 2;
+
+    var best = null, bestScore = Infinity;
+    state.visible.forEach(function (e) {
+      if (e.__uid === state.activeUid) return;
+      var node = state.nodes.get(e.__uid);
+      if (!node) return;
+      var dx = e.__x + node.offsetWidth / 2 - cx;
+      var dy = e.__y + node.offsetHeight / 2 - cy;
+      if (dx * vec[0] + dy * vec[1] <= 0) return;      // wrong direction
+      var offAxis = vec[0] !== 0 ? Math.abs(dy) : Math.abs(dx);
+      var score = Math.hypot(dx, dy) + offAxis * 1.4;  // prefer staying in lane
+      if (score < bestScore) { bestScore = score; best = e.__uid; }
+    });
+    if (best) centerOn(best);
+  }
+
+  /* Enter on the held entry does the obvious thing for its type. */
+  function openActive() {
+    var entry = state.visible.find(function (e) { return e.__uid === state.activeUid; });
+    if (!entry) return;
+    if (entry.type === 'image') { openLightbox(entry); return; }
+    if (entry.url) { window.open(entry.url, '_blank', 'noopener'); return; }
+    var node = state.nodes.get(entry.__uid);
+    if (node && state.view === 'compact') {
+      node.firstChild.classList.toggle('is-open');
+      scheduleLayout();
+    }
+  }
+
+  function focusSearch(seed) {
+    setConsoleOpen(true);
+    qInput.focus();
+    if (seed) { qInput.value = seed; runSearch(seed); }
+    else qInput.select();
+  }
+
+  window.addEventListener('keydown', function (e) {
+    if (!lightbox.hidden) {
+      if (e.key === 'Escape') { e.preventDefault(); closeLightbox(); }
+      return;
+    }
+
+    var mod = e.ctrlKey || e.metaKey;
+
+    if (mod && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); focusSearch(); return; }
+
+    if (e.key === 'Escape') {
+      if (!sheetEl.hidden) { toggleSheet(false); return; }
+      if (qInput.value) { qInput.value = ''; runSearch(''); qInput.blur(); return; }
+      if (state.tags.length) { state.tags = []; refresh(); return; }
+      if (document.activeElement !== document.body) document.activeElement.blur();
+      return;
+    }
+
+    if (editing() || mod || e.altKey) return;
+
+    switch (e.key) {
+      case 'ArrowLeft':  e.preventDefault(); stepFocus('left');  return;
+      case 'ArrowRight': e.preventDefault(); stepFocus('right'); return;
+      case 'ArrowUp':    e.preventDefault(); stepFocus('up');    return;
+      case 'ArrowDown':  e.preventDefault(); stepFocus('down');  return;
+      case 'Enter':      e.preventDefault(); openActive();  return;
+      case '0':          e.preventDefault(); frame(true);   return;
+      case '+': case '=': e.preventDefault(); zoomBy(1.25); return;
+      case '-': case '_': e.preventDefault(); zoomBy(1 / 1.25); return;
+      case '\\':         e.preventDefault(); setConsoleOpen(!consoleIsOpen()); return;
+      case '?':          e.preventDefault(); toggleSheet(); return;
+    }
+
+    /* Type anywhere to search — the README's original promise. */
+    if (e.key.length === 1 && /\S/.test(e.key)) {
+      e.preventDefault();
+      focusSearch(e.key);
+    }
+  });
+
+  /* ==============================================================
+     boot
+     ============================================================== */
+
+  async function init() {
+    showStatus('loading');
+    wireChrome();
+    readUrl();
+    paintSegs();
+    setConsoleOpen(window.innerWidth > 720);
+
+    var json;
+    try {
+      var res = await fetch('entries.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      json = await res.json();
+    } catch (err) {
+      showStatus('error', String(err.message || err));
+      return;
+    }
+
+    var raw = Array.isArray(json) ? json : (json.root || []);
+    raw.forEach(function (e, i) {
+      e.__uid = 'e' + i;
+      e.__index = i;
+      if (!e.id) e.id = Card.slugify(Card.entryTitle(e)) || 'item-' + i;
+    });
+    state.entries = raw;
+
+    if (!state.entries.length) {
+      showStatus('empty');
+      countEl.textContent = '0 items';
+      return;
+    }
+
+    showStatus(null);
+    refresh({ animate: false });
+
+    /* #some-entry-id deep link */
+    var hash = decodeURIComponent(location.hash.replace(/^#/, ''));
+    if (hash) {
+      var target = state.visible.find(function (e) { return e.id === hash; });
+      if (target) {
+        requestAnimationFrame(function () { centerOn(target.__uid, { zoom: 1 }); });
+      }
+    }
+
+    /* Late-loading fonts change every card's height. */
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { layout(); });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
-
-
