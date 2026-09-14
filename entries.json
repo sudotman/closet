@@ -1,18 +1,6 @@
 {
   "root": [
     {
-      "id": "text-haiku",
-      "type": "text",
-      "title": "small words",
-      "text": "you shall bow\nas has everyone\nas they always do",
-      "tags": [
-        "poem",
-        "haiku"
-      ],
-      "x": -200,
-      "y": -520
-    },
-    {
       "id": "link-portfolio",
       "type": "link",
       "title": "portfolio",
@@ -274,6 +262,45 @@
       "tags": [
         "life",
         "philosophy"
+      ]
+    },
+    {
+      "id": "deng-xiaoping",
+      "type": "text",
+      "title": "deng xiaoping",
+      "text": "if you open the window for some fresh air, you must expect some flies to blow in",
+      "tags": [
+        "philosophy",
+        "wisdom"
+      ]
+    },
+    {
+      "id": "deng-xiaoping-2",
+      "type": "text",
+      "title": "deng xiaoping 2",
+      "text": "poverty is not socialism, to be rich is glorious",
+      "tags": [
+        "life",
+        "wisdom"
+      ]
+    },
+    {
+      "id": "juniper-s-5th-wall-breaking",
+      "type": "youtube",
+      "title": "juniper's 5th wall breaking",
+      "youtubeId": "k9bOW5cNMvA",
+      "tags": [
+        "video"
+      ]
+    },
+    {
+      "id": "goat-on-goat-wallace-on-lynch",
+      "type": "youtube",
+      "title": "goat on goat - wallace on lynch",
+      "youtubeId": "C0Cvtu2FfGw",
+      "tags": [
+        "video",
+        "art"
       ]
     }
   ]
