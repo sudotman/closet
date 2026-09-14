@@ -302,6 +302,16 @@
         "video",
         "art"
       ]
+    },
+    {
+      "id": "need-to-keep-moving",
+      "type": "image",
+      "title": "need to keep moving",
+      "src": "/uploads/home-x.jpeg",
+      "tags": [
+        "life",
+        "photo"
+      ]
     }
   ]
 }
