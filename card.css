@@ -226,6 +226,171 @@
 .card:hover .card__tag { color: var(--fg-3); border-color: var(--line); }
 .card__tag.is-matched { color: var(--acid); border-color: var(--acid-line); }
 
+/* ---------- weight: what the wall is actually for ----------
+   Not every entry deserves the same glance. A quote is the point of
+   the closet; a link is a door you walk through. Drawn at one size
+   they cancel each other out, so here they stop being drawn alike.
+   Canvas only — the catalogue row below stays uniform on purpose. */
+
+/* — loud: the entries that say something — */
+
+.card--text:not(.card--compact),
+.card--text_link:not(.card--compact) {
+  --card-pad: 20px 19px 17px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.068), rgba(255,255,255,0.026));
+}
+.card--text:not(.card--compact):hover,
+.card--text_link:not(.card--compact):hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.090), rgba(255,255,255,0.036));
+}
+
+/* The title of a quote labels it; it isn't the thing. So it joins the
+   mono rail beside the sigil and the words get read first. */
+.card--text:not(.card--compact) .card__head,
+.card--text_link:not(.card--compact) .card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.card--text:not(.card--compact) .card__title,
+.card--text_link:not(.card--compact) .card__title {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  color: var(--fg-3);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card--text:not(.card--compact) .card__text,
+.card--text_link:not(.card--compact) .card__text {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.46;
+  letter-spacing: -0.016em;
+  text-wrap: pretty;
+}
+
+/* The reference under a quote is a footnote, not a headline. */
+.card--text_link:not(.card--compact) .card__link--inline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--fg-2);
+  border-bottom-color: var(--line);
+}
+.card--text_link:not(.card--compact) .card__link--inline:hover {
+  color: var(--ice);
+  border-bottom-color: rgba(156, 214, 255, 0.34);
+}
+
+/* — quiet: a pure link is a door, not an exhibit —
+   No glass, no lift, no panel: a hairline row on the wall. The
+   destination leads, because that is what you came here for. The
+   title of a link is rarely its name — it's a note about why it's
+   worth keeping — so it follows in a muted hand and wraps under the
+   destination when there is more to say than fits beside it. */
+
+.card--link:not(.card--compact) {
+  --card-pad: 8px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 5px;
+  width: max-content;
+  max-width: 100%;
+  border-radius: var(--r-lg);
+  border-color: var(--line-lo);
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.card--link:not(.card--compact)::before { display: none; }
+
+.card--link:not(.card--compact):hover {
+  border-color: var(--line-hi);
+  background: var(--surface-lo);
+  box-shadow: none;
+}
+.card--link:not(.card--compact).is-active {
+  border-color: var(--acid-line);
+  box-shadow: 0 0 0 1px var(--acid-soft);
+}
+
+/* The head is dissolved so its parts can be reordered against the
+   body: number, destination, note, tags. */
+.card--link:not(.card--compact) .card__head { display: contents; }
+.card--link:not(.card--compact) .card__sigil { display: none; }
+.card--link:not(.card--compact) .card__meta { order: 0; flex: 0 0 auto; }
+
+.card--link:not(.card--compact) .card__body {
+  order: 1;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.card--link:not(.card--compact) .card__link {
+  max-width: 100%;
+  padding: 0;
+  border-bottom: 0;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+.card--link:not(.card--compact):hover .card__link { color: var(--ice); }
+.card--link:not(.card--compact) .card__link-arrow { opacity: 0.45; }
+
+.card--link:not(.card--compact) .card__title {
+  order: 2;
+  /* min-width:0 is what keeps a long note inside the hairline instead
+     of spilling past it — a flex item will not shrink without it. */
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0;
+  color: var(--fg-3);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.card--link:not(.card--compact):hover .card__title { color: var(--fg-2); }
+
+/* It exists to be clicked, so the whole row is the target. */
+.card--link:not(.card--compact) .card__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* Tags on a door are a whisper, not a row of badges. */
+.card--link:not(.card--compact) .card__tags {
+  order: 3;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  flex-wrap: nowrap;
+  gap: 7px;
+}
+.card--link:not(.card--compact) .card__tag {
+  padding: 0;
+  border: 0;
+  color: var(--fg-4);
+}
+
 /* ---------- compact: the catalogue row ---------- */
 
 .card--compact {
@@ -290,4 +455,12 @@
   .card__text { font-size: 14.5px; }
   .card--compact { --card-pad: 10px 12px; gap: 10px; }
   .card--compact .card__tags { display: none; }
+
+  .card--text:not(.card--compact),
+  .card--text_link:not(.card--compact) { --card-pad: 17px 16px 15px; }
+  .card--text:not(.card--compact) .card__text,
+  .card--text_link:not(.card--compact) .card__text { font-size: 17.5px; }
+  .card--link:not(.card--compact) .card__tags { display: none; }
+  /* A narrow column needs a line more before a note reads as cut off. */
+  .card--link:not(.card--compact) .card__title { -webkit-line-clamp: 3; }
 }
